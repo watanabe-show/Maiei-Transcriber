@@ -170,6 +170,19 @@ async def job_status(request: Request, job_id: str) -> JSONResponse:
     return JSONResponse(jobs.public_view(job))
 
 
+@app.post("/api/jobs/{job_id}/polish")
+async def job_polish(request: Request, job_id: str) -> JSONResponse:
+    """完了済みジョブの本文を校正LLMで「整える」（表記補正のみ・背景実行）。"""
+    _require_auth(request)
+    if not config.GROQ_API_KEY:
+        raise HTTPException(status_code=400, detail="校正機能が利用できません（GROQ_API_KEY 未設定）。")
+    job = jobs.JOBS.get(job_id)
+    if job is None or job.get("status") != "done":
+        raise HTTPException(status_code=404, detail="完了したジョブが見つかりません。")
+    jobs.start_polish(job_id)
+    return JSONResponse({"ok": True})
+
+
 def _attachment(data: bytes, base: str, ext: str, mime: str) -> Response:
     """日本語ファイル名にも対応した添付ダウンロード応答。"""
     from urllib.parse import quote
@@ -183,14 +196,22 @@ def _attachment(data: bytes, base: str, ext: str, mime: str) -> Response:
 
 @app.get("/api/jobs/{job_id}/download")
 async def job_download(
-    request: Request, job_id: str, fmt: str = "txt", gran: str = formats.DEFAULT_GRAN
+    request: Request,
+    job_id: str,
+    fmt: str = "txt",
+    gran: str = formats.DEFAULT_GRAN,
+    polished: int = 0,
 ) -> Response:
     _require_auth(request)
     job = jobs.JOBS.get(job_id)
     if job is None or job.get("status") != "done":
         raise HTTPException(status_code=404, detail="完了したジョブが見つかりません。")
 
-    segments = job.get("segments") or []
+    # polished=1 かつ校正済みなら、整えた本文でダウンロードする（画面表示と一致させる）
+    if polished and job.get("polish_status") == "done" and job.get("_polish_segments"):
+        segments = job.get("_polish_segments") or []
+    else:
+        segments = job.get("segments") or []
     base = os.path.splitext(job.get("filename") or "transcript")[0] or "transcript"
     fmt = (fmt or "txt").lower()
     gran = (gran or formats.DEFAULT_GRAN).lower()
@@ -224,6 +245,7 @@ async def app_config(request: Request) -> JSONResponse:
         "direct_max_mb": config.DIRECT_UPLOAD_MAX_MB,
         "storage_max_mb": config.STORAGE_MAX_UPLOAD_MB,
         "part_mb": config.UPLOAD_PART_MB,
+        "correct_enabled": bool(config.GROQ_API_KEY),
     })
 
 

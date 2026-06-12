@@ -55,6 +55,43 @@ def transcribe_file(path: str, language: str | None = None, prompt: str | None =
     raise GroqError(resp.status_code, detail, retry_after=retry_after)
 
 
+def chat_complete(
+    messages: list[dict],
+    model: str | None = None,
+    temperature: float = 0.0,
+    max_tokens: int | None = None,
+    timeout: float = 120.0,
+) -> str:
+    """Groq のチャット補完（OpenAI互換 /chat/completions）。校正LLMに使う。
+
+    messages: [{"role": "system"|"user"|"assistant", "content": str}, ...]
+    返り値: アシスタントの本文テキスト。429 等は GroqError として送出する。
+    """
+    if not config.GROQ_API_KEY:
+        raise GroqError(0, "GROQ_API_KEY が設定されていません。")
+
+    url = f"{config.GROQ_BASE_URL}/chat/completions"
+    headers = {"Authorization": f"Bearer {config.GROQ_API_KEY}"}
+    data: dict = {
+        "model": model or config.CORRECT_MODEL,
+        "messages": messages,
+        "temperature": temperature,
+    }
+    if max_tokens:
+        data["max_tokens"] = max_tokens
+
+    with httpx.Client(timeout=httpx.Timeout(timeout), http2=False) as client:
+        resp = client.post(url, headers=headers, json=data)
+
+    if resp.status_code == 200:
+        body = resp.json()
+        return (body["choices"][0]["message"]["content"] or "").strip()
+
+    retry_after = _parse_retry_after(resp)
+    detail = _extract_error_message(resp)
+    raise GroqError(resp.status_code, detail, retry_after=retry_after)
+
+
 def _parse_retry_after(resp: httpx.Response) -> float | None:
     """Retry-After ヘッダ、または本文の 'try again in X' から待ち秒数を推定。"""
     header = resp.headers.get("retry-after")

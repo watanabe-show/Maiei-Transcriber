@@ -14,7 +14,7 @@ import uuid
 
 import httpx
 
-from . import config, formats, groq_client, media, vocab
+from . import config, correct, formats, groq_client, media, vocab
 
 # 一時的な通信エラー（SSL bad record mac / 接続断 / タイムアウト等）。
 # これらは自動でリトライする（ウイルス対策のHTTPS検査や不安定回線で起きやすい）。
@@ -112,6 +112,59 @@ async def _run(job_id: str) -> None:
                     storage.delete(key)
                 except Exception:
                     pass
+
+
+# ---------------------------------------------------------------- 校正（文章を整える）
+def start_polish(job_id: str) -> bool:
+    """完了済みジョブの本文を校正する背景タスクを開始する。"""
+    job = JOBS.get(job_id)
+    if job is None or job.get("status") != "done":
+        return False
+    if job.get("polish_status") == "processing":
+        return True   # すでに実行中
+    _set(
+        job,
+        polish_status="processing",
+        polish_progress=0,
+        polish_stage="整え中…",
+        polish_note=None,
+        polish_error=None,
+    )
+    task = asyncio.create_task(_run_polish(job_id))
+    job["_polish_task"] = task
+    return True
+
+
+async def _run_polish(job_id: str) -> None:
+    job = JOBS.get(job_id)
+    if job is None:
+        return
+    try:
+        segments = job.get("segments") or []
+        language = job["language"] or None
+        pack_id = job.get("_pack_id")
+
+        def cb(done: int, total: int) -> None:
+            job["polish_progress"] = int(100 * done / max(total, 1))
+            job["polish_stage"] = f"整え中… ({done}/{total})"
+            job["updated"] = time.time()
+
+        new_segments, note = await asyncio.to_thread(
+            correct.polish_segments, segments, language, pack_id, cb
+        )
+        views = formats.build_views(new_segments)
+        job["_polish_segments"] = new_segments   # ダウンロード用（フロントには送らない）
+        _set(
+            job,
+            polish_status="done",
+            polish_stage="完了",
+            polish_progress=100,
+            polish_views=views,
+            polish_text=formats.to_readable_text(views["plain"]),
+            polish_note=note,
+        )
+    except Exception as exc:  # 想定外はジョブに記録（元の結果は壊さない）
+        _set(job, polish_status="error", polish_error=str(exc))
 
 
 async def _process(job: dict) -> None:

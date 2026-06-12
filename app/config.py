@@ -19,6 +19,10 @@ GROQ_API_KEY = _clean("GROQ_API_KEY")
 GROQ_MODEL = _clean("GROQ_MODEL", "whisper-large-v3")
 GROQ_BASE_URL = _clean("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 
+# --- 校正LLM（「文章を整える」。Whisperとは別枠のチャットモデル）---
+# 表記ゆれ・変換ミスの修正だけに使う。Whisperの2,000回/日の枠とは別の枠で動く。
+CORRECT_MODEL = _clean("CORRECT_MODEL", "llama-3.3-70b-versatile")
+
 # --- 文字起こしの既定言語 ("ja"=日本語, "en"=英語, ""=自動判定) ---
 DEFAULT_LANGUAGE = _clean("DEFAULT_LANGUAGE", "ja")
 

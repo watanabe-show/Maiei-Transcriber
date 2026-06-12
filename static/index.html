@@ -17,7 +17,7 @@
         <div class="titles">
           <h1>AD毎日専用　文字起こし</h1>
           <div class="sub">MAIEI TRANSCRIBER</div>
-          <div class="launch-date">2026.06.12 起動</div>
+          <div class="launch-date">2026.06.12 起動 ・ ver 1.1</div>
         </div>
       </div>
       <div class="nav">
@@ -121,6 +121,12 @@
         </label>
       </div>
       <div class="gran-desc" id="granDesc"></div>
+
+      <div class="row polish-row hidden" id="polishRow" style="margin-top:6px; align-items:center; gap:10px">
+        <button class="btn" id="polishBtn">✨ 文章を整える（固有名詞の表記補正）</button>
+        <button class="btn btn-ghost hidden" id="revertBtn">元に戻す</button>
+        <span class="small muted" id="polishStatus"></span>
+      </div>
 
       <div class="transcript" id="transcript"></div>
 
