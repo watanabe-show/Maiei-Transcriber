@@ -18,7 +18,7 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: DEFAULT_LANGUAGE
-        value: ja
+        value: auto
       - key: GROQ_MODEL
         value: whisper-large-v3
       # ----- 大容量動画むけ：R2(S3互換)直アップロード（任意。未設定なら従来動作）-----
