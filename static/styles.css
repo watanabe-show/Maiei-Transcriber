@@ -173,13 +173,15 @@ select, input[type="password"], input[type="text"] {
 select:focus, input:focus { border-color: var(--vermilion); background: #fbf6e6; }
 
 /* ---- パスワード表示切替 ---- */
-.pw-field { position: relative; }
-.pw-field input { padding-right: 58px; }
+.pw-field { position: relative; display: block; }
+/* 入力欄を枠いっぱいに広げ、ボタンが右端に正しく重なるようにする。
+   中央寄せの文字が片寄らないよう左右のパディングを対称にする。 */
+.pw-field input { width: 100%; box-sizing: border-box; padding-left: 54px; padding-right: 54px; }
 .pw-toggle {
-  position: absolute; top: 50%; right: 8px; transform: translateY(-50%);
+  position: absolute; top: 50%; right: 6px; transform: translateY(-50%);
   background: none; border: none; cursor: pointer;
-  font-family: inherit; font-size: 12px; letter-spacing: .08em;
-  color: var(--vermilion-d); padding: 4px 6px;
+  font-family: inherit; font-size: 12px; letter-spacing: .06em;
+  color: var(--vermilion-d); padding: 6px 8px; line-height: 1;
 }
 .pw-toggle:hover { color: var(--vermilion); text-decoration: underline; }
 

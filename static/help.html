@@ -16,7 +16,7 @@
         <img class="crest" src="/images/imgi_2_no-img.png" alt="" />
         <div class="titles"><h1>使い方ガイド</h1></div>
       </div>
-      <a class="btn btn-stamp" href="/">← 文字起こしに戻る</a>
+      <button type="button" class="btn btn-stamp js-close">✕ このタブを閉じる</button>
     </div>
 
     <!-- 概要 -->
@@ -158,10 +158,21 @@
 
     <div class="foot">
       <hr class="rule" />
-      <a class="btn btn-ghost" href="/">← 文字起こしに戻る</a>
+      <button type="button" class="btn btn-ghost js-close">✕ このタブを閉じる</button>
+      <p class="boot-note" id="closeHint" style="display:none">このタブはブラウザの「×」ボタンで閉じてください。</p>
     </div>
   </div>
 
   <div class="filmstrip"></div>
+
+  <script>
+    // このページは入力画面から新規タブで開かれる。閉じるだけにする。
+    function closeTab() {
+      window.close();
+      // 閉じられないブラウザ向けの案内（履歴のあるタブ等）
+      setTimeout(() => { const h = document.getElementById('closeHint'); if (h) h.style.display = 'block'; }, 350);
+    }
+    document.querySelectorAll('.js-close').forEach((b) => b.addEventListener('click', closeTab));
+  </script>
 </body>
 </html>
