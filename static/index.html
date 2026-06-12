@@ -79,19 +79,20 @@
       <div class="result-head">
         <h2 class="head" style="margin:0">文字起こし結果</h2>
         <div class="spacer"></div>
-        <label class="field field-row">切り方
+        <label class="field field-row">TCの切り方
           <select id="gran">
             <option value="sentence">一文ごと</option>
             <option value="sec5">5秒ごと</option>
             <option value="sec10" selected>10秒ごと</option>
             <option value="sec30">30秒ごと</option>
             <option value="min1">1分ごと</option>
-            <option value="para_short">段落ごと(短)</option>
-            <option value="para_long">段落ごと(長)</option>
+            <option value="para_breath">段落ごと(息継ぎ)</option>
+            <option value="para_meaning">段落ごと(文意)</option>
             <option value="plain">TimeCodeなし</option>
           </select>
         </label>
       </div>
+      <div class="gran-desc" id="granDesc"></div>
 
       <div class="transcript" id="transcript"></div>
 

@@ -278,6 +278,7 @@ function renderResult(job) {
   hide(progressPanel);
   show(resultPanel);
   currentGran = $("gran").value || "sec10";
+  updateGranDesc();
   renderView();
 }
 
@@ -314,8 +315,25 @@ function renderView() {
   }
 }
 
+// 各切り方の説明（プルダウンの下に表示）。formats.py の GRAN_DESCRIPTIONS と対応。
+const GRAN_DESC = {
+  sentence: "文末（。！？）に加え、息継ぎ（無音）や長さでも区切る。いちばん細かい。",
+  sec5: "約5秒ごとに時間（TimeCode）を表示。細かい頭出し向け。",
+  sec10: "約10秒ごとに時間を表示。標準的なバランス。",
+  sec30: "約30秒ごとに時間を表示。長い会議・講演向け。",
+  min1: "約1分ごとに時間を表示。とても長い録音向け。",
+  para_breath: "息継ぎ（無音の間）だけで段落分け。話し言葉の自然な区切り。",
+  para_meaning: "無音＋文末＋長さから文意の切れ目を推測して段落分け。記事・議事録向け。",
+  plain: "時間表示なしの読みやすい本文（段落分け）。清書・配布向け。",
+};
+function updateGranDesc() {
+  const el = $("granDesc");
+  if (el) el.textContent = GRAN_DESC[currentGran] || "";
+}
+
 $("gran").addEventListener("change", () => {
   currentGran = $("gran").value;
+  updateGranDesc();
   renderView();
 });
 

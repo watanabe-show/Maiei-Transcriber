@@ -186,9 +186,20 @@ select:focus, input:focus { border-color: var(--vermilion); background: #fbf6e6;
 /* ---- 結果ヘッダ ---- */
 .result-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
 
-/* 結果ヘッダの「切り方」プルダウン（横並び）*/
+/* 結果ヘッダの「TCの切り方」プルダウン（横並び）*/
 .field-row { flex-direction: row; align-items: center; gap: 10px; }
 .field-row select { font-size: 14px; padding: 8px 11px; }
+
+/* 選択中の切り方の説明（プルダウンの下）*/
+.gran-desc {
+  width: 100%;
+  margin: -4px 0 12px;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  letter-spacing: .02em;
+  line-height: 1.6;
+}
+.gran-desc:empty { display: none; }
 
 /* ---- 原稿（文字起こし本文）---- */
 .transcript {

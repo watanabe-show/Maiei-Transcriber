@@ -16,10 +16,26 @@ GRAN_LABELS = {
     "sec10": "10秒ごと",
     "sec30": "30秒ごと",
     "min1": "1分ごと",
-    "para_short": "段落ごと(短)",
-    "para_long": "段落ごと(長)",
+    "para_breath": "段落ごと(息継ぎ)",
+    "para_meaning": "段落ごと(文意)",
     "plain": "TimeCodeなし",
 }
+
+# 各切り方の説明（画面のプルダウン下・使い方ページで共用）。
+GRAN_DESCRIPTIONS = {
+    "sentence": "文末（。！？）に加え、息継ぎ（無音）や長さでも区切る。いちばん細かい。",
+    "sec5": "約5秒ごとに時間（TimeCode）を表示。細かい頭出し向け。",
+    "sec10": "約10秒ごとに時間を表示。標準的なバランス。",
+    "sec30": "約30秒ごとに時間を表示。長い会議・講演向け。",
+    "min1": "約1分ごとに時間を表示。とても長い録音向け。",
+    "para_breath": "息継ぎ（無音の間）だけで段落分け。話し言葉の自然な区切り。",
+    "para_meaning": "無音＋文末＋長さから文意の切れ目を推測して段落分け。記事・議事録向け。",
+    "plain": "時間表示なしの読みやすい本文（段落分け）。清書・配布向け。",
+}
+
+# 古い切り方キーの後方互換（保存URL等で渡ってきたとき用）。
+_GRAN_ALIASES = {"para_short": "para_breath", "para_long": "para_meaning"}
+
 DEFAULT_GRAN = "sec10"
 
 
@@ -112,11 +128,17 @@ def group_time_blocks(segments: list[dict], interval: float = 10.0) -> list[dict
     return blocks
 
 
-def group_sentences(segments: list[dict]) -> list[dict]:
-    """一文ごとにまとめる。文末記号（。！？等）で終わったところで区切る。
+def group_sentences(
+    segments: list[dict], gap: float = 0.6, max_chars: int = 60
+) -> list[dict]:
+    """一文ごとにまとめる。
 
-    Whisperのセグメントは文の途中で切れることがあるので、文末記号が
-    出るまで連結し、出たら1ブロックとして確定する。いちばん細かい切り方。
+    文末記号（。！？等）で区切るのが基本だが、Whisperの日本語出力は
+    句読点が乏しく、それだけだと巨大な1ブロックになりがち。そこで、
+    句読点が無くても次のいずれかで区切る:
+      ・直前との無音の間（息継ぎ）が gap 秒以上
+      ・1ブロックが max_chars 文字以上になった（際限ない連結を防ぐ）
+    これにより、句読点が少ない音声でも自然な一文単位に近づく。
     返り値: [{start, end, text}, ...]
     """
     blocks: list[dict] = []
@@ -129,19 +151,56 @@ def group_sentences(segments: list[dict]) -> list[dict]:
         start = float(seg.get("start", 0.0))
         end = float(seg.get("end", 0.0))
 
+        if cur is not None:
+            ended = cur["text"][-1] in _SENT_END
+            silence = start - cur["end"]
+            too_long = len(cur["text"]) >= max_chars
+            if ended or silence >= gap or too_long:
+                blocks.append(cur)
+                cur = None
+
         if cur is None:
             cur = {"start": start, "end": end, "text": text}
         else:
             cur["text"] += text
             cur["end"] = end
 
-        if cur["text"][-1] in _SENT_END:
-            blocks.append(cur)
-            cur = None
-
     if cur:
         blocks.append(cur)
     return blocks
+
+
+def group_breath(segments: list[dict], gap: float = 0.8) -> list[dict]:
+    """息継ぎ（無音の間）だけで段落にまとめる。
+
+    文末記号や文字数は見ず、純粋に「間（ま）が gap 秒以上空いたら段落を切る」。
+    話し言葉の自然な呼吸の区切りに沿うので、句読点に依存しない。
+    返り値: [{start, end, text}, ...]（各段落の先頭時刻でTCを表示する）
+    """
+    paras: list[dict] = []
+    cur: dict | None = None
+
+    for seg in segments:
+        text = (seg.get("text") or "").strip()
+        if not text:
+            continue
+        start = float(seg.get("start", 0.0))
+        end = float(seg.get("end", 0.0))
+
+        if cur is None:
+            cur = {"start": start, "end": end, "text": text}
+            continue
+
+        if (start - cur["end"]) >= gap:
+            paras.append(cur)
+            cur = {"start": start, "end": end, "text": text}
+        else:
+            cur["text"] += text
+            cur["end"] = end
+
+    if cur:
+        paras.append(cur)
+    return paras
 
 
 def build_blocks(segments: list[dict], gran: str = DEFAULT_GRAN) -> list[dict]:
@@ -149,6 +208,7 @@ def build_blocks(segments: list[dict], gran: str = DEFAULT_GRAN) -> list[dict]:
 
     "plain"（TimeCodeなし）は段落区切りを返す（表示側で時間を出さない）。
     """
+    gran = _GRAN_ALIASES.get(gran, gran)  # 旧キー(para_short/long)を新キーへ
     if gran == "sentence":
         return group_sentences(segments)
     if gran == "sec5":
@@ -157,10 +217,10 @@ def build_blocks(segments: list[dict], gran: str = DEFAULT_GRAN) -> list[dict]:
         return group_time_blocks(segments, 30)
     if gran == "min1":
         return group_time_blocks(segments, 60)
-    if gran == "para_short":
-        return group_paragraphs(segments, gap=0.6, max_chars=70)
-    if gran == "para_long":
-        return group_paragraphs(segments, gap=1.2, max_chars=250)
+    if gran == "para_breath":
+        return group_breath(segments, gap=0.8)
+    if gran == "para_meaning":
+        return group_paragraphs(segments, gap=1.0, max_chars=200)
     if gran == "plain":
         return group_paragraphs(segments)
     return group_time_blocks(segments, 10)  # "sec10"（既定）

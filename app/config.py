@@ -22,6 +22,30 @@ GROQ_BASE_URL = _clean("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 # --- 文字起こしの既定言語 ("ja"=日本語, "en"=英語, ""=自動判定) ---
 DEFAULT_LANGUAGE = _clean("DEFAULT_LANGUAGE", "ja")
 
+# --- 句読点プライミング（prompt）---
+# Whisperは prompt の文体を真似る性質があり、句読点付きの例文を渡すと
+# 出力にも句読点が入りやすくなる。「一文ごと」の区切り精度を底上げする。
+# 言語自動判定(auto)時は言語を誤検出させないよう prompt を渡さない。
+PUNCT_PROMPT_JA = _clean(
+    "PUNCT_PROMPT_JA",
+    "以下は、日本語の音声を句読点を付けて書き起こしたものです。"
+    "こんにちは。今日は、よろしくお願いします。それでは、始めます。",
+)
+PUNCT_PROMPT_EN = _clean(
+    "PUNCT_PROMPT_EN",
+    "The following is a transcript with proper punctuation. "
+    "Hello. Thanks for joining today. Let's get started.",
+)
+
+
+def punct_prompt(language: str | None) -> str | None:
+    """言語に応じた句読点プライミング用 prompt を返す（auto/不明なら None）。"""
+    if language == "ja":
+        return PUNCT_PROMPT_JA or None
+    if language == "en":
+        return PUNCT_PROMPT_EN or None
+    return None
+
 # --- パスワード認証（複数人運用）---
 # APP_PASSWORD: 共有パスワード（1つ）
 # APP_PASSWORDS: カンマ区切りで複数のパスワードを許可（配布・無効化しやすい）

@@ -109,6 +109,8 @@ async def _run(job_id: str) -> None:
 
 async def _process(job: dict) -> None:
     language = job["language"] or None
+    # 句読点を促す prompt（一文ごとの区切り精度を上げる。auto時は None）
+    prompt = config.punct_prompt(language)
 
     # R2経由（大容量動画）は、ffmpegがURLから読み込むため変換に数分かかることがある。
     # 文言で待ち時間の理由を伝える。
@@ -132,7 +134,7 @@ async def _process(job: dict) -> None:
         label = f"文字起こし中… ({i + 1}/{total})" if total > 1 else "文字起こし中…"
         _set(job, stage=label, progress=10 + int(85 * i / max(total, 1)))
 
-        result = await _transcribe_with_retry(fpath, language, job)
+        result = await _transcribe_with_retry(fpath, language, job, prompt)
 
         for seg in result.get("segments", []) or []:
             text = (seg.get("text") or "").strip()
@@ -169,7 +171,7 @@ def _joined_text(segments: list[dict]) -> str:
     return "".join(seg["text"] for seg in segments).strip()
 
 
-async def _transcribe_with_retry(fpath: str, language, job: dict) -> dict:
+async def _transcribe_with_retry(fpath: str, language, job: dict, prompt: str | None = None) -> dict:
     """429（利用制限）とSSL/通信エラーを自動リトライしつつ文字起こしする。"""
     rate_wait = 5.0          # 429時の待機（指数的に増やす）
     rate_retries = 0
@@ -180,7 +182,7 @@ async def _transcribe_with_retry(fpath: str, language, job: dict) -> dict:
     while True:
         try:
             # 同期httpxを別スレッドで実行（Windows asyncioのSSL不具合を回避）
-            return await asyncio.to_thread(groq_client.transcribe_file, fpath, language)
+            return await asyncio.to_thread(groq_client.transcribe_file, fpath, language, prompt)
 
         except groq_client.GroqError as err:
             # APIが429（レート制限）を返した場合 → 指定秒数だけ待って再試行
