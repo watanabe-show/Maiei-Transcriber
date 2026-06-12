@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>文字起こし</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="filmstrip"></div>
+
+  <div class="container">
+    <div class="appbar">
+      <div class="brand">
+        <img class="crest" src="/images/imgi_2_no-img.png" alt="" />
+        <div class="titles">
+          <h1>文字起こし</h1>
+        </div>
+      </div>
+      <div class="nav">
+        <a class="btn btn-ghost" href="/help">使い方</a>
+        <button class="btn btn-ghost" id="logoutBtn">ログアウト</button>
+      </div>
+    </div>
+
+    <!-- アップロード -->
+    <div class="panel" id="uploadPanel">
+      <h2 class="head">ファイルを選ぶ</h2>
+      <div class="note">
+        💡 <b>無料枠の目安（Groq）</b>：1時間あたり 音声およそ<b>2時間分</b>まで・1日 約<b>2,000回</b>まで無料。
+        ふだんの利用ならほぼ¥0です。
+      </div>
+      <div class="drop" id="drop">
+        <div class="reel">🎞️</div>
+        <div class="big">音声・動画ファイルをドラッグ＆ドロップ</div>
+        <div class="hint">またはクリックして選択　／　対応形式は <a href="/help">使い方</a> を参照</div>
+        <input type="file" id="fileInput" class="hidden"
+               accept=".mp3,.m4a,.wav,.aac,.flac,.ogg,.oga,.opus,.wma,.mp4,.mov,.m4v,.webm,.mkv,.avi,.mpeg,.mpg,.3gp,audio/*,video/*" />
+      </div>
+
+      <div class="row between" style="margin-top:18px">
+        <label class="field">言語
+          <select id="language">
+            <option value="ja">日本語</option>
+            <option value="en">英語</option>
+            <option value="auto">自動判定</option>
+          </select>
+        </label>
+        <button class="btn" id="recordBtn">● マイクで録音</button>
+      </div>
+
+      <div class="filelist hidden" id="fileBox">
+        <div class="fileitem">
+          <span>🎧</span>
+          <span class="name" id="fileName"></span>
+          <span class="size" id="fileSize"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 進捗 -->
+    <div class="panel hidden" id="progressPanel">
+      <h2 class="head" id="progressTitle">処理中…</h2>
+      <div class="progress-head">
+        <span class="small muted">しばらくお待ちください</span>
+        <span class="pct" id="progressPct">0%</span>
+      </div>
+      <div class="bar"><span id="bar"></span></div>
+      <div class="stage" id="stage">準備中…</div>
+    </div>
+
+    <!-- 結果 -->
+    <div class="panel hidden" id="resultPanel">
+      <div class="result-head">
+        <h2 class="head" style="margin:0">文字起こし結果</h2>
+        <div class="spacer"></div>
+        <label class="field field-row">切り方
+          <select id="gran">
+            <option value="sentence">一文ごと</option>
+            <option value="sec5">5秒ごと</option>
+            <option value="sec10" selected>10秒ごと</option>
+            <option value="sec30">30秒ごと</option>
+            <option value="min1">1分ごと</option>
+            <option value="para_short">段落ごと(短)</option>
+            <option value="para_long">段落ごと(長)</option>
+            <option value="plain">TimeCodeなし</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="transcript" id="transcript"></div>
+
+      <div class="row" style="margin-top:16px">
+        <button class="btn" id="copyBtn">📋 コピー</button>
+        <button class="btn" id="dlTxt">⬇ テキスト(.txt)</button>
+        <button class="btn" id="dlDocx">⬇ Word(.docx)</button>
+        <button class="btn" id="dlXlsx">⬇ Excel(.xlsx)</button>
+        <button class="btn" id="dlSrt">⬇ 字幕(.srt)</button>
+        <div class="spacer"></div>
+        <button class="btn btn-stamp" id="againBtn">＋ 別のファイル</button>
+      </div>
+      <div class="hint" style="margin-top:8px">
+        ※「テキスト・Word・Excel」は、上で選んだ<b>切り方</b>のまま保存されます。字幕(.srt)は字幕用の細かい単位です。
+      </div>
+    </div>
+
+    <div class="foot">
+      <hr class="rule" />
+      Groq Whisper による自動文字起こし（話者分離なし）。文章の「切り方」は一文ごと〜段落ごとから選べます。<br />
+      アップロードしたファイルは処理後にサーバーから自動削除されます。
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <div class="filmstrip"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

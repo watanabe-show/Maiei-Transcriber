@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(cd \"C:\\\\Users\\\\user\\\\Documents\\\\毎映transcriber\"; $env:PYTHONIOENCODING=\"utf-8\"; .venv\\\\Scripts\\\\python.exe scripts\\\\smoke_test.py 2>&1 | Out-String)",
+      "PowerShell(cd \"C:\\\\Users\\\\user\\\\Documents\\\\毎映transcriber\"; $env:PYTHONIOENCODING=\"utf-8\"; & .venv\\\\Scripts\\\\python.exe scripts\\\\smoke_test.py | Out-String)"
+    ]
+  }
+}

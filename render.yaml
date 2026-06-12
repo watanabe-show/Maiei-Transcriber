@@ -1,0 +1,24 @@
+# Render（無料枠）でネット公開するための設定。
+# 1) このフォルダをGitHubに上げる  2) Render で New > Blueprint  3) このリポジトリを選択
+# 4) 環境変数 GROQ_API_KEY と APP_PASSWORD をダッシュボードで設定
+services:
+  - type: web
+    name: voice-transcriber
+    runtime: python
+    rootDir: transcriber
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.4"
+      - key: GROQ_API_KEY
+        sync: false        # ダッシュボードで入力（コミットしない）
+      - key: APP_PASSWORD
+        sync: false        # ダッシュボードで入力
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEFAULT_LANGUAGE
+        value: ja
+      - key: GROQ_MODEL
+        value: whisper-large-v3

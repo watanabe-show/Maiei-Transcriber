@@ -1,0 +1,170 @@
+"""簡易スモークテスト。実際のGroq呼び出し以外を一通り検証する。
+
+実行: .venv の python で  python scripts/smoke_test.py
+"""
+import os
+import subprocess
+import sys
+import tempfile
+import time
+
+# 設定を import より前に注入（GROQキーは空＝API手前まで検証）
+os.environ.setdefault("GROQ_API_KEY", "")
+os.environ.setdefault("APP_PASSWORD", "test123")
+os.environ.setdefault("DEFAULT_LANGUAGE", "ja")
+
+# プロジェクトルートを import パスに追加
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+
+from app import media, formats  # noqa: E402
+from app.main import app  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+PASS, FAIL = "  [OK]", "  [NG]"
+results = []
+
+
+def check(name, cond, extra=""):
+    line = f"{PASS if cond else FAIL} {name}" + (f"  ({extra})" if extra else "")
+    print(line)
+    results.append(bool(cond))
+    return cond
+
+
+print("=== 1. ffmpeg ===")
+ff = media.ffmpeg_exe()
+check("ffmpeg 実行ファイルが見つかる", os.path.exists(ff), ff)
+
+work = tempfile.mkdtemp(prefix="smoke_")
+tone = os.path.join(work, "tone.wav")
+subprocess.run(
+    [ff, "-hide_banner", "-loglevel", "error", "-y",
+     "-f", "lavfi", "-i", "sine=frequency=440:duration=3", tone],
+    check=True,
+)
+check("テスト音声(3秒)を生成", os.path.exists(tone) and os.path.getsize(tone) > 0)
+
+print("=== 2. 変換＆分割 (1秒ごと→3チャンク想定) ===")
+seg_dir = os.path.join(work, "chunks")
+files = media.transcode_and_segment(tone, seg_dir, chunk_seconds=1)
+check("mp3チャンクが複数生成される", len(files) >= 2, f"{len(files)}個")
+check("各チャンクが0バイト超", all(os.path.getsize(f) > 0 for f in files))
+
+print("=== 3. 出力フォーマット ===")
+segs = [
+    {"start": 0.0, "end": 2.5, "text": "こんにちは"},
+    {"start": 2.5, "end": 5.0, "text": "テストです"},
+    {"start": 9.0, "end": 11.0, "text": "別の段落です"},  # 4秒の間→新段落
+]
+paras = formats.group_paragraphs(segs)
+check("無音の間で段落が分かれる(2段落)", len(paras) == 2, f"{len(paras)}段落")
+
+blocks10 = formats.group_time_blocks(
+    [{"start": 0, "end": 3, "text": "あ"},
+     {"start": 4, "end": 7, "text": "い"},
+     {"start": 12, "end": 14, "text": "う"}], interval=10)
+check("約10秒ごとにTCブロック分割(2ブロック)", len(blocks10) == 2, f"{len(blocks10)}ブロック")
+
+srt, ext, mime = formats.render_text(segs, "srt")
+check("SRTにタイムスタンプ行が含まれる", "00:00:00,000 --> 00:00:02,500" in srt, ext)
+vtt, _, _ = formats.render_text(segs, "vtt")
+check("VTTヘッダがある", vtt.startswith("WEBVTT"))
+txt, _, _ = formats.render_text(segs, "txt")
+check("整形txtが本文を含む", "こんにちは" in txt and "別の段落です" in txt)
+tts, _, _ = formats.render_text(segs, "txt_ts")
+check("時間つきtxtに[00:00:00]が付く", "[00:00:00]" in tts)
+
+from app import documents  # noqa: E402
+docx_bytes = documents.build_docx(paras, title="テスト")
+check("Word(.docx)が生成される(zip/PK署名)", docx_bytes[:2] == b"PK" and len(docx_bytes) > 2000)
+xlsx_bytes = documents.build_xlsx(paras, segs)
+check("Excel(.xlsx)が生成される(zip/PK署名)", xlsx_bytes[:2] == b"PK" and len(xlsx_bytes) > 2000)
+
+print("=== 4. HTTP エンドポイント ===")
+client = TestClient(app)
+
+r = client.get("/api/me")
+check("/api/me 未ログインは authed=false", r.json().get("authed") is False)
+
+r = client.get("/")
+check("/ 未ログインはログイン画面", "パスワード" in r.text)
+
+r = client.post("/api/login", data={"password": "wrong"})
+check("誤った合言葉は401", r.status_code == 401)
+
+r = client.post("/api/login", data={"password": "test123"})
+check("正しい合言葉でログイン成功", r.status_code == 200 and r.json().get("ok") is True)
+
+r = client.get("/")
+check("ログイン後はアプリ画面(ドロップゾーン)", "ドラッグ" in r.text)
+
+# アップロード→ジョブ作成
+with open(tone, "rb") as fh:
+    r = client.post(
+        "/api/transcribe",
+        files={"file": ("tone.wav", fh, "audio/wav")},
+        data={"language": "ja"},
+    )
+ok = r.status_code == 200 and "job_id" in r.json()
+check("アップロードでジョブ作成", ok, f"status={r.status_code}")
+
+print("=== 5. ジョブ処理パイプライン（直接実行） ===")
+import asyncio  # noqa: E402
+import shutil  # noqa: E402
+
+from app import jobs  # noqa: E402
+
+pj_work = tempfile.mkdtemp(prefix="job_")
+pj_input = os.path.join(pj_work, "input.wav")
+shutil.copy(tone, pj_input)
+jid = jobs.create_job("tone.wav", pj_work, pj_input, "ja")
+asyncio.run(jobs._run(jid))
+job = jobs.JOBS[jid]
+check("パイプラインが終了状態に到達", job["status"] in ("done", "error"), job["status"])
+# キーがあれば done、無ければ GROQ_API_KEY エラー（どちらも想定どおり）
+either = job["status"] == "done" or (
+    job["status"] == "error" and "GROQ_API_KEY" in (job.get("error") or "")
+)
+check("ffmpeg変換→Groq呼び出しまで到達", either,
+      job.get("error") or f"segments={len(job.get('segments') or [])}")
+
+# 不正拡張子
+r = client.post("/api/transcribe",
+                files={"file": ("bad.txt", b"hello", "text/plain")},
+                data={"language": "ja"})
+check("非対応拡張子は400で拒否", r.status_code == 400)
+
+print("=== 6. 切り方（一文/秒ごと/段落/TimeCodeなし）===")
+# 一文ごと: 文末記号で区切る（「今日は」＋「晴れです。」は1文に連結される）
+segs_sent = [
+    {"start": 0, "end": 2, "text": "おはよう。"},
+    {"start": 2, "end": 4, "text": "今日は"},
+    {"start": 4, "end": 6, "text": "晴れです。"},
+    {"start": 6, "end": 8, "text": "そうですね。"},
+]
+sent = formats.group_sentences(segs_sent)
+check("一文ごとに文末で区切る(3文)", len(sent) == 3, f"{len(sent)}文")
+
+# 約6秒間隔の素材：5秒ごとは30秒ごとより細かく割れる
+segs_time = [{"start": i * 6, "end": i * 6 + 2, "text": f"文{i}。"} for i in range(6)]
+views = formats.build_views(segs_time)
+check("build_viewsが全ての切り方を返す", set(views) == set(formats.GRAN_LABELS),
+      f"{len(views)}種類")
+b5 = formats.build_blocks(segs_time, "sec5")
+b30 = formats.build_blocks(segs_time, "sec30")
+check("5秒ごとは30秒ごとより細かい", len(b5) > len(b30), f"5秒={len(b5)} / 30秒={len(b30)}")
+
+t_plain, _, _ = formats.render_text(segs_time, "txt", "plain")
+check("テキスト(TimeCodeなし)に[時刻]が無い", "[00:00:00]" not in t_plain)
+t_tc, _, _ = formats.render_text(segs_time, "txt", "sec5")
+check("テキスト(5秒ごと)に[時刻]が付く", "[00:00:00]" in t_tc)
+
+docx_plain = documents.build_docx(views["plain"], title="t", show_tc=False)
+check("Word(TimeCodeなし)が生成される", docx_plain[:2] == b"PK" and len(docx_plain) > 2000)
+xlsx_lbl = documents.build_xlsx(b5, segs_time, body_label="本文（5秒ごと）")
+check("Excel(切り方ラベル付)が生成される", xlsx_lbl[:2] == b"PK" and len(xlsx_lbl) > 2000)
+
+print("\n=== 結果 ===")
+print(f"  成功 {sum(results)} / {len(results)}")
+sys.exit(0 if all(results) else 1)

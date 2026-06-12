@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>使い方｜文字起こし</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="filmstrip"></div>
+
+  <div class="container help">
+    <div class="appbar">
+      <div class="brand">
+        <img class="crest" src="/images/imgi_2_no-img.png" alt="" />
+        <div class="titles"><h1>使い方ガイド</h1></div>
+      </div>
+      <a class="btn btn-stamp" href="/">← 文字起こしに戻る</a>
+    </div>
+
+    <!-- 概要 -->
+    <div class="panel">
+      <h2 class="head">このアプリについて</h2>
+      <p>
+        音声・動画ファイルをアップロードすると、自動で文字起こしをします。
+        動画は音声だけを取り出して処理します。結果は画面で確認でき、テキスト・Word・Excel・字幕として保存できます。
+      </p>
+      <p class="muted small">
+        ※ 文字起こしエンジンは Groq の Whisper を使用。話者分離（誰が話したかの区別）はありません。
+      </p>
+    </div>
+
+    <!-- 使い方の流れ -->
+    <div class="panel">
+      <h2 class="head">使い方の流れ</h2>
+      <ol class="flow">
+        <li><b>ログイン</b> — 配布されたパスワードを入力します。</li>
+        <li><b>言語を選ぶ</b> — 日本語／英語／自動判定（通常は「日本語」）。</li>
+        <li><b>ファイルを入れる</b> — 枠にドラッグ＆ドロップ、またはクリックして選択。
+          マイク録音からそのまま起こすこともできます。</li>
+        <li><b>処理を待つ</b> — 「音声に変換 → 文字起こし」の進捗が表示されます。長い音声は自動で分割処理します。</li>
+        <li><b>結果を確認</b> — 右上の「切り方」で表示の区切り（一文ごと〜段落ごと／TimeCodeなし）を選べます。</li>
+        <li><b>保存する</b> — コピー、またはテキスト・Word・Excel・字幕で保存。テキスト・Word・Excelは画面で選んだ「切り方」のまま保存されます。</li>
+      </ol>
+    </div>
+
+    <!-- 対応形式 -->
+    <div class="panel">
+      <h2 class="head">対応しているファイル形式</h2>
+      <h3>音声</h3>
+      <p>
+        <span class="tag">.mp3</span><span class="tag">.m4a</span><span class="tag">.wav</span>
+        <span class="tag">.aac</span><span class="tag">.flac</span><span class="tag">.ogg</span>
+        <span class="tag">.oga</span><span class="tag">.opus</span><span class="tag">.wma</span>
+      </p>
+      <h3>動画（音声を自動抽出）</h3>
+      <p>
+        <span class="tag">.mp4</span><span class="tag">.mov</span><span class="tag">.m4v</span>
+        <span class="tag">.webm</span><span class="tag">.mkv</span><span class="tag">.avi</span>
+        <span class="tag">.mpeg</span><span class="tag">.mpg</span><span class="tag">.3gp</span>
+      </p>
+      <p class="muted small">
+        アップロードの上限は既定で 300MB です（設定で変更可）。とても大きい動画はローカル起動での利用がおすすめです。
+      </p>
+    </div>
+
+    <!-- 切り方 -->
+    <div class="panel">
+      <h2 class="head">文章の「切り方」を選ぶ</h2>
+      <p class="muted small">結果画面の右上で選べます。テキスト・Word・Excelの保存にもそのまま反映されます。
+        「○秒ごと」も必ず文・句読点の切れ目で区切るので、文の途中では切れません。</p>
+      <table>
+        <tr><th>切り方</th><th>内容</th><th>向いている用途</th></tr>
+        <tr><td>一文ごと</td><td>文の終わり（。！？など）で区切る。いちばん細かい。</td><td>字幕・精密な編集</td></tr>
+        <tr><td>5秒ごと</td><td>約5秒ごとに時間（TimeCode）を表示。</td><td>細かい頭出し</td></tr>
+        <tr><td>10秒ごと（既定）</td><td>約10秒ごとに時間を表示。標準的なバランス。</td><td>標準</td></tr>
+        <tr><td>30秒ごと</td><td>約30秒ごとに時間を表示。</td><td>長い会議・講演</td></tr>
+        <tr><td>1分ごと</td><td>約1分ごとに時間を表示。</td><td>とても長い録音</td></tr>
+        <tr><td>段落ごと(短)</td><td>息継ぎ（無音）で短めに段落分け。先頭に時間。</td><td>読みやすさ重視</td></tr>
+        <tr><td>段落ごと(長)</td><td>無音＋長さでまとめた長めの段落。先頭に時間。</td><td>記事・議事録</td></tr>
+        <tr><td>TimeCodeなし</td><td>時間表示なしの読みやすい本文（段落分け）。</td><td>清書・配布</td></tr>
+      </table>
+    </div>
+
+    <!-- 保存形式 -->
+    <div class="panel">
+      <h2 class="head">保存の形式</h2>
+      <table>
+        <tr><th>種類</th><th>内容</th></tr>
+        <tr><td>テキスト(.txt)</td><td>選んだ切り方の本文。「TimeCodeなし」なら時間なし、それ以外は <span class="ext">[時:分:秒]</span> 付き。</td></tr>
+        <tr><td>Word(.docx)</td><td>選んだ切り方で、時間見出し＋本文。明朝体で整形（TimeCodeなしは見出しなし）。</td></tr>
+        <tr><td>Excel(.xlsx)</td><td>「本文（選んだ切り方）」と「詳細（セグメント）」の2シート。列＝No／開始／終了／本文。</td></tr>
+        <tr><td>字幕(.srt)</td><td>動画字幕用。切り方に関係なく、細かいセグメント単位の開始・終了時間つき。</td></tr>
+      </table>
+    </div>
+
+    <!-- 仕組み -->
+    <div class="panel">
+      <h2 class="head">仕組み（内部処理）</h2>
+      <ol>
+        <li>ブラウザからファイルをサーバーへアップロード。</li>
+        <li>サーバー内で <b>ffmpeg</b> が音声を 16kHz モノラルの軽い音声に変換（動画は音声のみ抽出）。</li>
+        <li>長い音声は約10分ごとに自動分割。</li>
+        <li>各部分を <b>Groq Whisper</b> に送って文字起こし → タイムスタンプを連結。</li>
+        <li>選んだ「切り方」に合わせて区切り、各まとまりの先頭にTimeCodeを付けて表示。</li>
+      </ol>
+      <p class="muted small">構成：Python + FastAPI（単一サーバー・ビルド不要）。ffmpeg はアプリに同梱。</p>
+    </div>
+
+    <!-- 料金 -->
+    <div class="panel">
+      <h2 class="head">料金（無料枠の目安）</h2>
+      <div class="ok2">
+        Groq 無料枠：<b>1時間あたり 音声およそ2時間分</b>まで・<b>1日 約2,000回</b>まで無料。
+        ふだんの利用ならほぼ¥0です。
+      </div>
+      <p class="muted small">
+        無料枠を使い切っても、有料は1時間あたり数円〜十数円程度と安価です（モデルにより変動）。
+      </p>
+    </div>
+
+    <!-- プライバシーとセキュリティ -->
+    <div class="panel">
+      <h2 class="head">プライバシーとセキュリティ</h2>
+      <ul>
+        <li>アップロードしたファイルは一時フォルダで処理し、<b>処理後に自動削除</b>します（サーバーに残しません）。</li>
+        <li>文字起こしのため、音声データは <b>Groq のサーバー（クラウド）に送信</b>されます。機密性の高い音声は、この点をご了承のうえご利用ください。</li>
+        <li>アプリは <b>パスワードでログイン</b>する必要があります。利用しない人には知らせないでください。</li>
+        <li>このアプリが触れるのは「文字起こし機能」と画面表示用の画像だけです。
+          <b>あなたのPC内のファイルにアクセスする機能はありません。</b></li>
+      </ul>
+      <div class="warn">
+        <b>公開範囲について：</b> ローカル起動時、既定では<b>このPC内だけ（localhost）</b>で動きます。
+        同じWi‑Fiの他の人にも使ってもらいたい場合のみ、起動設定を「LAN公開」に切り替えてください
+        （その場合もパスワードで保護されます）。インターネット全体に公開したい場合は Render 等へのデプロイをご利用ください。
+      </div>
+    </div>
+
+    <!-- 困ったとき -->
+    <div class="panel">
+      <h2 class="head">困ったとき</h2>
+      <table>
+        <tr><th>症状</th><th>対処</th></tr>
+        <tr><td>「パスワードが違います」</td><td>設定ファイル(.env)の APP_PASSWORD と入力を確認。</td></tr>
+        <tr><td>「GROQ_API_KEY が設定されていません」</td><td>.env に Groq のキーを入れて起動し直す。</td></tr>
+        <tr><td>動画で「音声トラックが見つかりません」</td><td>その動画に音声が含まれているか確認。</td></tr>
+        <tr><td>SSL / 通信エラー</td><td>ウイルス対策のHTTPS検査・VPN・プロキシ・不安定なWi‑Fiが原因のことが多い。自動で数回再試行します。</td></tr>
+        <tr><td>途中で止まる</td><td>無料枠の制限の可能性。少し時間をおいて再実行（自動で待機・再試行もします）。</td></tr>
+      </table>
+    </div>
+
+    <div class="foot">
+      <hr class="rule" />
+      <a class="btn btn-ghost" href="/">← 文字起こしに戻る</a>
+    </div>
+  </div>
+
+  <div class="filmstrip"></div>
+</body>
+</html>
