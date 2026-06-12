@@ -360,6 +360,7 @@ select:focus, input:focus { border-color: var(--vermilion); background: #fbf6e6;
 .login-card h1 { margin: 6px 0 2px; font-size: 30px; letter-spacing: .26em; }
 .login-card .lead { color: var(--ink-soft); font-size: 12.5px; letter-spacing: .34em; margin-bottom: 4px; text-transform: uppercase; }
 .login-card .desc { color: var(--ink-soft); font-size: 13.5px; margin: 14px 0 18px; letter-spacing: .04em; }
+.boot-note { color: var(--ink-soft); font-size: 12px; letter-spacing: .04em; line-height: 1.6; margin: 14px auto 0; max-width: 320px; opacity: .85; }
 .login-form { display: flex; flex-direction: column; gap: 14px; max-width: 320px; margin: 0 auto; }
 .login-form input { text-align: center; letter-spacing: .3em; }
 .login-err { color: var(--vermilion-d); font-size: 13px; min-height: 18px; font-weight: 700; }
