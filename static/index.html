@@ -37,34 +37,48 @@
         💡 <b>無料枠の目安（Groq）</b>：1時間あたり 音声およそ<b>2時間分</b>まで・1日 約<b>2,000回</b>まで無料。
         ふだんの利用ならほぼ¥0です。
       </div>
-      <div class="drop" id="drop">
-        <div class="reel">🎞️</div>
-        <div class="big">音声・動画ファイルをドラッグ＆ドロップ</div>
-        <div class="hint">またはクリックして選択</div>
-        <div class="hint" style="margin-top:6px;font-size:0.82em;opacity:0.75;">
-          音声：mp3 / m4a / wav / aac / flac / ogg / oga / opus / wma<br>
-          動画：mp4 / mov / m4v / webm / mkv / avi / mpeg / mpg / 3gp
+      <!-- ① ファイルを選ぶ / 録音する -->
+      <div id="pickSection">
+        <div class="drop" id="drop">
+          <div class="reel">🎞️</div>
+          <div class="big">音声・動画ファイルをドラッグ＆ドロップ</div>
+          <div class="hint">またはクリックして選択</div>
+          <div class="hint" style="margin-top:6px;font-size:0.82em;opacity:0.75;">
+            音声：mp3 / m4a / wav / aac / flac / ogg / oga / opus / wma<br>
+            動画：mp4 / mov / m4v / webm / mkv / avi / mpeg / mpg / 3gp
+          </div>
+          <input type="file" id="fileInput" class="hidden"
+                 accept=".mp3,.m4a,.wav,.aac,.flac,.ogg,.oga,.opus,.wma,.mp4,.mov,.m4v,.webm,.mkv,.avi,.mpeg,.mpg,.3gp,audio/*,video/*" />
         </div>
-        <input type="file" id="fileInput" class="hidden"
-               accept=".mp3,.m4a,.wav,.aac,.flac,.ogg,.oga,.opus,.wma,.mp4,.mov,.m4v,.webm,.mkv,.avi,.mpeg,.mpg,.3gp,audio/*,video/*" />
+        <div class="row" style="margin-top:18px; justify-content:flex-end">
+          <button class="btn" id="recordBtn">● マイクで録音</button>
+        </div>
       </div>
 
-      <div class="row between" style="margin-top:18px">
-        <label class="field">言語
-          <select id="language">
-            <option value="auto" selected>自動判定</option>
-            <option value="ja">日本語</option>
-            <option value="en">英語</option>
-          </select>
-        </label>
-        <button class="btn" id="recordBtn">● マイクで録音</button>
-      </div>
+      <!-- ② 言語を選んで開始 -->
+      <div id="confirmSection" class="hidden">
+        <div class="filelist" id="fileBox">
+          <div class="fileitem">
+            <span>🎧</span>
+            <span class="name" id="fileName"></span>
+            <span class="size" id="fileSize"></span>
+          </div>
+        </div>
 
-      <div class="filelist hidden" id="fileBox">
-        <div class="fileitem">
-          <span>🎧</span>
-          <span class="name" id="fileName"></span>
-          <span class="size" id="fileSize"></span>
+        <div class="lang-pick">
+          <div class="lang-label">音声の言語を選んでください</div>
+          <div class="lang-group" id="langGroup">
+            <button type="button" class="lang-btn active" data-lang="ja">日本語</button>
+            <button type="button" class="lang-btn" data-lang="en">英語</button>
+            <button type="button" class="lang-btn" data-lang="auto">他言語</button>
+          </div>
+          <div class="lang-note" id="langNote">日本語の音声を文字起こしします。</div>
+        </div>
+
+        <div class="row" style="margin-top:18px">
+          <button class="btn btn-stamp" id="startBtn">▶ 文字起こし開始</button>
+          <div class="spacer"></div>
+          <button class="btn btn-ghost" id="repickBtn">別のファイルを選ぶ</button>
         </div>
       </div>
     </div>

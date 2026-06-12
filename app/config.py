@@ -20,7 +20,7 @@ GROQ_MODEL = _clean("GROQ_MODEL", "whisper-large-v3")
 GROQ_BASE_URL = _clean("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 
 # --- 文字起こしの既定言語 ("ja"=日本語, "en"=英語, ""=自動判定) ---
-DEFAULT_LANGUAGE = _clean("DEFAULT_LANGUAGE", "auto")
+DEFAULT_LANGUAGE = _clean("DEFAULT_LANGUAGE", "ja")
 
 # --- 句読点プライミング（prompt）---
 # Whisperは prompt の文体を真似る性質があり、句読点付きの例文を渡すと

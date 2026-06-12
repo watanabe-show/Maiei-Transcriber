@@ -6,6 +6,8 @@ const drop = $("drop");
 const fileInput = $("fileInput");
 const fileBox = $("fileBox");
 const uploadPanel = $("uploadPanel");
+const pickSection = $("pickSection");
+const confirmSection = $("confirmSection");
 const progressPanel = $("progressPanel");
 const resultPanel = $("resultPanel");
 
@@ -13,6 +15,8 @@ let currentJobId = null;
 let views = {};           // { gran: [{start,end,text}] }  各切り方ごとのブロック
 let pollTimer = null;
 let currentGran = "sec10";   // 選択中の切り方（プルダウンと連動）
+let selectedFile = null;     // 選択中のファイル（開始ボタンで送信）
+let selectedLang = "ja";     // 選択中の言語（ja=日本語 / en=英語 / auto=他言語）
 
 // サーバー設定（/api/config で上書き）。storage_enabled の時だけ大容量直アップ経路を使う。
 let APP_CONFIG = { storage_enabled: false, direct_max_mb: 200, storage_max_mb: 3000, part_mb: 64 };
@@ -59,11 +63,44 @@ fileInput.addEventListener("change", () => {
 });
 
 function handleFile(file) {
+  selectedFile = file;
   $("fileName").textContent = file.name;
   $("fileSize").textContent = fmtSize(file.size);
-  show(fileBox);
-  startTranscription(file);
+  // ②の確認エリア（言語選択＋開始）へ。ここではまだ文字起こしを始めない。
+  hide(pickSection);
+  show(confirmSection);
+  hide(progressPanel); progressPanel.classList.remove("err-box");
+  confirmSection.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
+
+// ---------------------------------------------------------------- language pick
+const LANG_NOTE = {
+  ja: "日本語の音声を文字起こしします。",
+  en: "英語の音声を文字起こしします（英語のまま出力されます）。",
+  auto: "言語を自動判定します（日本語・英語以外の音声はこちら）。",
+};
+$("langGroup").addEventListener("click", (e) => {
+  const btn = e.target.closest(".lang-btn");
+  if (!btn) return;
+  selectedLang = btn.dataset.lang;
+  for (const b of $("langGroup").querySelectorAll(".lang-btn")) {
+    b.classList.toggle("active", b === btn);
+  }
+  $("langNote").textContent = LANG_NOTE[selectedLang] || "";
+});
+
+$("startBtn").addEventListener("click", () => {
+  if (!selectedFile) return;
+  startTranscription(selectedFile);
+});
+
+$("repickBtn").addEventListener("click", () => {
+  selectedFile = null;
+  fileInput.value = "";
+  hide(confirmSection);
+  show(pickSection);
+  hide(progressPanel); progressPanel.classList.remove("err-box");
+});
 
 // ---------------------------------------------------------------- transcribe
 async function startTranscription(file) {
@@ -92,7 +129,7 @@ async function startTranscription(file) {
 async function uploadDirect(file) {
   const body = new FormData();
   body.append("file", file);
-  body.append("language", $("language").value);
+  body.append("language", selectedLang);
   const res = await fetch("/api/transcribe", { method: "POST", body });
   if (res.status === 401) { location.href = "/"; return null; }
   if (!res.ok) {
@@ -205,7 +242,7 @@ async function runMultipart(file, info) {
   const body = new FormData();
   body.append("key", key);
   body.append("filename", file.name);
-  body.append("language", $("language").value);
+  body.append("language", selectedLang);
   const txRes = await fetch("/api/transcribe-key", { method: "POST", body });
   if (txRes.status === 401) { const u = new Error("unauth"); u.unauth = true; throw u; }
   if (!txRes.ok) {
@@ -360,10 +397,11 @@ $("dlXlsx").addEventListener("click", () => download("xlsx"));
 $("dlSrt").addEventListener("click", () => download("srt"));
 
 $("againBtn").addEventListener("click", () => {
-  hide(resultPanel); hide(fileBox);
+  hide(resultPanel);
   hide(progressPanel); progressPanel.classList.remove("err-box");
-  show(uploadPanel);   // 入力エリア（ドラッグ＆ドロップ）を戻す
-  fileInput.value = "";
+  show(uploadPanel);
+  hide(confirmSection); show(pickSection);   // 入力エリア（ドラッグ＆ドロップ）に戻す
+  fileInput.value = ""; selectedFile = null;
   currentJobId = null; views = {};
   window.scrollTo({ top: 0, behavior: "smooth" });
 });
