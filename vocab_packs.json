@@ -1,0 +1,49 @@
+{
+  "version": "1.0",
+  "_note": "業種別の語彙パック。選んだパックの固有名詞を Whisper の prompt と校正LLMに注入し、表記精度を上げる。各 term は2026年上半期時点の現職要人・報道用語を想定。要人交代・用語の流行に合わせて定期更新すること。各パックは注入時に Whisper prompt の上限（日本語=概算200字 / 英語=概算800字 ≒224トークン）内に収まる程度の語数に保つ。日本語パック(ja)はオーナーが UTF-8 の元ファイルで差し替える運用。",
+  "packs": {
+    "ja": {},
+    "en": {
+      "us_admin": {
+        "label": "Administration / White House",
+        "terms": ["White House", "Donald Trump", "J.D. Vance", "Oval Office", "executive order", "press secretary", "chief of staff", "National Security Council", "administration", "second term", "Cabinet"]
+      },
+      "us_diplomacy": {
+        "label": "Diplomacy / State Department",
+        "terms": ["Marco Rubio", "State Department", "Secretary of State", "diplomacy", "Indo-Pacific", "NATO", "United Nations", "bilateral", "ceasefire", "sanctions", "ambassador", "foreign policy", "Strait of Hormuz"]
+      },
+      "us_defense": {
+        "label": "Defense / Military",
+        "terms": ["Pete Hegseth", "Pentagon", "Department of Defense", "Secretary of Defense", "Joint Chiefs of Staff", "deterrence", "deployment", "aircraft carrier", "Indo-Pacific Command", "troops", "Strait of Hormuz", "Iran"]
+      },
+      "us_economy": {
+        "label": "Economy / Treasury / Fed",
+        "terms": ["Scott Bessent", "Treasury Department", "Secretary of the Treasury", "Federal Reserve", "Jerome Powell", "interest rate", "inflation", "fiscal policy", "Wall Street", "Treasury yields", "recession", "GDP"]
+      },
+      "us_trade": {
+        "label": "Trade / Tariffs",
+        "terms": ["Jamieson Greer", "U.S. Trade Representative", "USTR", "tariff", "reciprocal tariff", "USMCA", "trade deficit", "supply chain", "semiconductor", "trade negotiation", "export controls"]
+      },
+      "us_justice": {
+        "label": "Justice / Legal",
+        "terms": ["Todd Blanche", "Department of Justice", "Attorney General", "Supreme Court", "federal court", "indictment", "deposition", "litigation", "plaintiff", "defendant", "subpoena", "jurisdiction", "appeal"]
+      },
+      "us_congress": {
+        "label": "Congress / Elections",
+        "terms": ["Congress", "Senate", "House of Representatives", "Capitol Hill", "midterm elections", "Republican", "Democrat", "filibuster", "appropriations", "bipartisan", "confirmation hearing", "caucus"]
+      },
+      "us_energy": {
+        "label": "Energy",
+        "terms": ["Department of Energy", "crude oil", "natural gas", "LNG", "OPEC", "shale", "pipeline", "energy security", "drilling", "refinery", "nuclear power"]
+      },
+      "us_homeland": {
+        "label": "Immigration / Homeland Security",
+        "terms": ["Markwayne Mullin", "Department of Homeland Security", "DHS", "border security", "immigration", "deportation", "cartel", "ICE", "asylum", "counterterrorism"]
+      },
+      "us_tech": {
+        "label": "Technology / AI",
+        "terms": ["artificial intelligence", "generative AI", "semiconductor", "data center", "AI regulation", "quantum computing", "SpaceX", "cybersecurity", "Silicon Valley", "export controls", "chip"]
+      }
+    }
+  }
+}

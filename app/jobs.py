@@ -14,7 +14,7 @@ import uuid
 
 import httpx
 
-from . import config, formats, groq_client, media
+from . import config, formats, groq_client, media, vocab
 
 # 一時的な通信エラー（SSL bad record mac / 接続断 / タイムアウト等）。
 # これらは自動でリトライする（ウイルス対策のHTTPS検査や不安定回線で起きやすい）。
@@ -30,12 +30,18 @@ _SEMAPHORE = asyncio.Semaphore(2)
 
 
 def create_job(
-    filename: str, workdir: str, input_path: str, language: str, key: str | None = None
+    filename: str,
+    workdir: str,
+    input_path: str,
+    language: str,
+    key: str | None = None,
+    pack_id: str | None = None,
 ) -> str:
     """ジョブを作る。
 
     input_path はローカルファイルパス、または R2 の presigned GET URL（ffmpegは両方扱える）。
     key は R2 のオブジェクトキー。指定時は処理後に R2 から削除する。
+    pack_id は語彙パックのID（指定時は Whisper prompt と校正に語彙を注入）。
     """
     job_id = uuid.uuid4().hex
     JOBS[job_id] = {
@@ -52,6 +58,7 @@ def create_job(
         "_workdir": workdir,
         "_input_path": input_path,
         "_key": key,                 # R2経由のときだけ入る（後始末用）
+        "_pack_id": pack_id,         # 語彙パックID（未選択なら None）
         "created": time.time(),
         "updated": time.time(),
     }
@@ -108,9 +115,11 @@ async def _run(job_id: str) -> None:
 
 
 async def _process(job: dict) -> None:
-    language = job["language"] or None
-    # 句読点を促す prompt（一文ごとの区切り精度を上げる。auto時は None）
-    prompt = config.punct_prompt(language)
+    language = job["language"] or None       # 'ja'/'en'/None(自動判定)
+    pack_id = job.get("_pack_id")
+    # ベースとなる Whisper prompt：語彙パックがあればそれを使い、無ければ
+    # 従来の句読点プライミング（auto時は None）。チャンクごとに前チャンク末尾を足す。
+    base_prompt = vocab.build_vocab_prompt(language, pack_id) or config.punct_prompt(language)
 
     # R2経由（大容量動画）は、ffmpegがURLから読み込むため変換に数分かかることがある。
     # 文言で待ち時間の理由を伝える。
@@ -129,12 +138,18 @@ async def _process(job: dict) -> None:
     all_segments: list[dict] = []
     text_parts: list[str] = []
     offset = 0.0
+    prev_tail = ""   # 前チャンク末尾（表記の連続性のため次チャンクへ短く引き継ぐ）
 
     for i, fpath in enumerate(files):
         label = f"文字起こし中… ({i + 1}/{total})" if total > 1 else "文字起こし中…"
         _set(job, stage=label, progress=10 + int(85 * i / max(total, 1)))
 
+        # 語彙パック（優先）＋前チャンク末尾を、トークン上限内で1つの prompt に。
+        prompt = vocab.compose_prompt(language, base_prompt, prev_tail)
         result = await _transcribe_with_retry(fpath, language, job, prompt)
+
+        # 次チャンクへの引き継ぎ用に、このチャンク本文の末尾だけを保持（500字引き継ぎはしない）
+        prev_tail = vocab.tail_for_carryover(result.get("text"), language)
 
         for seg in result.get("segments", []) or []:
             text = (seg.get("text") or "").strip()

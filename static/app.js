@@ -17,6 +17,8 @@ let pollTimer = null;
 let currentGran = "sec10";   // 選択中の切り方（プルダウンと連動）
 let selectedFile = null;     // 選択中のファイル（開始ボタンで送信）
 let selectedLang = "ja";     // 選択中の言語（ja=日本語 / en=英語 / auto=他言語）
+let selectedPack = "";       // 選択中の語彙パックID（""=選択しない）
+let APP_VOCAB = { ja: [], en: [] };   // /api/vocab で上書き（言語別の [{id,label}]）
 
 // サーバー設定（/api/config で上書き）。storage_enabled の時だけ大容量直アップ経路を使う。
 let APP_CONFIG = { storage_enabled: false, direct_max_mb: 200, storage_max_mb: 3000, part_mb: 64 };
@@ -27,6 +29,17 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const res = await fetch("/api/config");
     if (res.ok) APP_CONFIG = Object.assign(APP_CONFIG, await res.json());
   } catch (_) { /* 取得できなければ従来動作のまま */ }
+})();
+
+(async function loadVocab() {
+  try {
+    const res = await fetch("/api/vocab");
+    if (res.ok) {
+      const v = await res.json();
+      APP_VOCAB = { ja: v.ja || [], en: v.en || [] };
+    }
+  } catch (_) { /* 取得できなければ語彙パックなしで動く */ }
+  populateVocab(selectedLang);
 })();
 
 // ---------------------------------------------------------------- utils
@@ -70,6 +83,7 @@ function handleFile(file) {
   hide(pickSection);
   show(confirmSection);
   hide(progressPanel); progressPanel.classList.remove("err-box");
+  populateVocab(selectedLang);
   confirmSection.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
@@ -87,7 +101,31 @@ $("langGroup").addEventListener("click", (e) => {
     b.classList.toggle("active", b === btn);
   }
   $("langNote").textContent = LANG_NOTE[selectedLang] || "";
+  populateVocab(selectedLang);   // 言語に合わせて語彙パックの候補を入れ替える
 });
+
+// 選択中の言語に対応する語彙パックをプルダウンに入れる（既定は「選択しない」）。
+// パックが1つも無い言語（他言語・未登録）では語彙パック欄自体を隠す。
+function populateVocab(lang) {
+  const sel = $("vocabPack");
+  if (!sel) return;
+  const packs = (lang === "ja" || lang === "en") ? (APP_VOCAB[lang] || []) : [];
+  sel.innerHTML = "";
+  const none = document.createElement("option");
+  none.value = "";
+  none.textContent = "選択しない（語彙補正なし）";
+  sel.appendChild(none);
+  for (const p of packs) {
+    const opt = document.createElement("option");
+    opt.value = p.id;
+    opt.textContent = p.label;
+    sel.appendChild(opt);
+  }
+  sel.value = "";
+  selectedPack = "";
+  $("vocabPick").style.display = packs.length ? "" : "none";
+}
+$("vocabPack").addEventListener("change", () => { selectedPack = $("vocabPack").value; });
 
 $("startBtn").addEventListener("click", () => {
   if (!selectedFile) return;
@@ -130,6 +168,7 @@ async function uploadDirect(file) {
   const body = new FormData();
   body.append("file", file);
   body.append("language", selectedLang);
+  body.append("pack_id", selectedPack);
   const res = await fetch("/api/transcribe", { method: "POST", body });
   if (res.status === 401) { location.href = "/"; return null; }
   if (!res.ok) {
@@ -243,6 +282,7 @@ async function runMultipart(file, info) {
   body.append("key", key);
   body.append("filename", file.name);
   body.append("language", selectedLang);
+  body.append("pack_id", selectedPack);
   const txRes = await fetch("/api/transcribe-key", { method: "POST", body });
   if (txRes.status === 401) { const u = new Error("unauth"); u.unauth = true; throw u; }
   if (!txRes.ok) {

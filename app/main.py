@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import config, documents, formats, jobs, storage
+from . import config, documents, formats, jobs, storage, vocab
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.dirname(BASE_DIR)
@@ -101,8 +101,17 @@ async def logout(request: Request) -> JSONResponse:
 
 
 # ---------------------------------------------------------------- transcription API
+@app.get("/api/vocab")
+async def api_vocab(request: Request) -> JSONResponse:
+    """語彙パックの一覧（言語別 [{id,label}]）を返す。フロントの選択肢に使う。"""
+    _require_auth(request)
+    return JSONResponse(vocab.list_packs())
+
+
 @app.post("/api/transcribe")
-async def transcribe(request: Request, file: UploadFile, language: str = Form("")) -> JSONResponse:
+async def transcribe(
+    request: Request, file: UploadFile, language: str = Form(""), pack_id: str = Form("")
+) -> JSONResponse:
     _require_auth(request)
 
     filename = file.filename or "audio"
@@ -147,7 +156,7 @@ async def transcribe(request: Request, file: UploadFile, language: str = Form(""
         shutil.rmtree(workdir, ignore_errors=True)
         raise HTTPException(status_code=400, detail="空のファイルです。")
 
-    job_id = jobs.create_job(filename, workdir, input_path, lang)
+    job_id = jobs.create_job(filename, workdir, input_path, lang, pack_id=pack_id.strip() or None)
     jobs.start(job_id)
     return JSONResponse({"job_id": job_id})
 
@@ -317,6 +326,7 @@ async def transcribe_key(
     key: str = Form(...),
     filename: str = Form("audio"),
     language: str = Form(""),
+    pack_id: str = Form(""),
 ) -> JSONResponse:
     """R2にアップ済みのオブジェクト(key)を文字起こしする。
 
@@ -340,7 +350,9 @@ async def transcribe_key(
 
     # チャンク用の作業ディレクトリだけ用意（入力本体はR2からストリーミングする）
     workdir = tempfile.mkdtemp(prefix="tx_")
-    job_id = jobs.create_job(filename, workdir, get_url, lang, key=key)
+    job_id = jobs.create_job(
+        filename, workdir, get_url, lang, key=key, pack_id=pack_id.strip() or None
+    )
     jobs.start(job_id)
     return JSONResponse({"job_id": job_id})
 

@@ -75,6 +75,14 @@
           <div class="lang-note" id="langNote">日本語の音声を文字起こしします。</div>
         </div>
 
+        <div class="lang-pick" id="vocabPick">
+          <div class="lang-label">語彙パック（固有名詞の表記補正）</div>
+          <select id="vocabPack">
+            <option value="" selected>選択しない（語彙補正なし）</option>
+          </select>
+          <div class="lang-note">選んだ分野の固有名詞をWhisperに教え、人名・専門用語の表記精度を上げます。迷ったら「選択しない」のままでOK。</div>
+        </div>
+
         <div class="row" style="margin-top:18px">
           <button class="btn btn-stamp" id="startBtn">▶ 文字起こし開始</button>
           <div class="spacer"></div>
