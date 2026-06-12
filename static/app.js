@@ -14,6 +14,17 @@ let views = {};           // { gran: [{start,end,text}] }  各切り方ごとの
 let pollTimer = null;
 let currentGran = "sec10";   // 選択中の切り方（プルダウンと連動）
 
+// サーバー設定（/api/config で上書き）。storage_enabled の時だけ大容量直アップ経路を使う。
+let APP_CONFIG = { storage_enabled: false, direct_max_mb: 200, storage_max_mb: 3000, part_mb: 64 };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+(async function loadConfig() {
+  try {
+    const res = await fetch("/api/config");
+    if (res.ok) APP_CONFIG = Object.assign(APP_CONFIG, await res.json());
+  } catch (_) { /* 取得できなければ従来動作のまま */ }
+})();
+
 // ---------------------------------------------------------------- utils
 function toast(msg, kind = "") {
   const t = $("toast");
@@ -63,22 +74,167 @@ async function startTranscription(file) {
   $("progressTitle").textContent = "アップロード中…";
   setProgress(2, "ファイルを送信しています…");
 
-  const body = new FormData();
-  body.append("file", file);
-  body.append("language", $("language").value);
+  // 大きいファイル かつ ストレージ有効時のみ、ブラウザ→R2へ直接アップロードする。
+  const useStorage =
+    APP_CONFIG.storage_enabled && file.size > APP_CONFIG.direct_max_mb * 1048576;
 
   try {
-    const res = await fetch("/api/transcribe", { method: "POST", body });
-    if (res.status === 401) { location.href = "/"; return; }
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      return fail(data.detail || "アップロードに失敗しました。");
-    }
-    const data = await res.json();
-    currentJobId = data.job_id;
+    const jobId = useStorage ? await uploadViaStorage(file) : await uploadDirect(file);
+    if (!jobId) return;   // 失敗時は内部で fail() 済み（またはリダイレクト）
+    currentJobId = jobId;
     $("progressTitle").textContent = "処理中…";
     poll();
   } catch (_) { fail("サーバーに接続できませんでした。"); }
+}
+
+// 従来どおりサーバー経由でアップロード（小さいファイル・マイク録音）
+async function uploadDirect(file) {
+  const body = new FormData();
+  body.append("file", file);
+  body.append("language", $("language").value);
+  const res = await fetch("/api/transcribe", { method: "POST", body });
+  if (res.status === 401) { location.href = "/"; return null; }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    fail(data.detail || "アップロードに失敗しました。");
+    return null;
+  }
+  return (await res.json()).job_id;
+}
+
+// 大容量：R2へ multipart で直接アップロード → /api/transcribe-key でジョブ化
+async function uploadViaStorage(file) {
+  const initRes = await fetch("/api/uploads/initiate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filename: file.name, size: file.size }),
+  });
+  if (initRes.status === 401) { location.href = "/"; return null; }
+  if (!initRes.ok) {
+    const d = await initRes.json().catch(() => ({}));
+    fail(d.detail || "アップロードの準備に失敗しました。");
+    return null;
+  }
+  const info = await initRes.json();
+  try {
+    return await runMultipart(file, info);
+  } catch (err) {
+    // 後始末（サーバー側のライフサイクルでも掃除されるが念のため中断要求）
+    try {
+      await fetch("/api/uploads/abort", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: info.key, upload_id: info.upload_id }),
+      });
+    } catch (_) { /* noop */ }
+    if (err && err.unauth) { location.href = "/"; return null; }
+    fail((err && err.message) || "大容量アップロードに失敗しました。通信状況を確認してお試しください。");
+    return null;
+  }
+}
+
+async function runMultipart(file, info) {
+  const { key, upload_id, part_size, part_count } = info;
+  const partUrls = info.part_urls.slice();        // 失効時に差し替える
+  const partLoaded = new Array(part_count).fill(0);
+  const etags = new Array(part_count);
+
+  const refresh = () => {
+    const sum = partLoaded.reduce((a, b) => a + b, 0);
+    setProgress(
+      2 + Math.round(96 * sum / file.size),
+      `アップロード中… ${fmtSize(sum)} / ${fmtSize(file.size)}`
+    );
+  };
+
+  // 1パートをPUT（失効時はURL再発行、指数バックオフで最大4回再試行）
+  async function putPart(idx) {
+    const start = idx * part_size;
+    const blob = file.slice(start, Math.min(start + part_size, file.size));
+    let lastErr = null;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      partLoaded[idx] = 0; refresh();
+      try {
+        etags[idx] = await xhrPut(partUrls[idx], blob, idx, partLoaded, refresh);
+        partLoaded[idx] = blob.size; refresh();
+        return;
+      } catch (e) {
+        if (e && e.unauth) throw e;
+        lastErr = e;
+        try {   // URLが失効していた可能性 → 該当パートだけ再発行
+          const r = await fetch("/api/uploads/parts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ key, upload_id, part_numbers: [idx + 1] }),
+          });
+          if (r.status === 401) { const u = new Error("unauth"); u.unauth = true; throw u; }
+          if (r.ok) { const j = await r.json(); partUrls[idx] = j.part_urls[String(idx + 1)] || partUrls[idx]; }
+        } catch (e2) { if (e2 && e2.unauth) throw e2; }
+        await sleep(Math.min(1000 * 2 ** attempt, 8000));
+      }
+    }
+    throw lastErr || new Error("パートの送信に失敗しました。");
+  }
+
+  // 並列3でパートを送信
+  const CONCURRENCY = 3;
+  let cursor = 0;
+  async function worker() {
+    while (cursor < part_count) { await putPart(cursor++); }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(CONCURRENCY, part_count) }, worker)
+  );
+
+  // 確定（complete）
+  const parts = etags.map((etag, i) => ({ PartNumber: i + 1, ETag: etag }));
+  const compRes = await fetch("/api/uploads/complete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key, upload_id, parts }),
+  });
+  if (compRes.status === 401) { const u = new Error("unauth"); u.unauth = true; throw u; }
+  if (!compRes.ok) {
+    const d = await compRes.json().catch(() => ({}));
+    throw new Error(d.detail || "アップロードの確定に失敗しました。");
+  }
+
+  // 文字起こし開始（元ファイル名を引き回す）
+  setProgress(99, "アップロード完了。文字起こしを開始します…");
+  const body = new FormData();
+  body.append("key", key);
+  body.append("filename", file.name);
+  body.append("language", $("language").value);
+  const txRes = await fetch("/api/transcribe-key", { method: "POST", body });
+  if (txRes.status === 401) { const u = new Error("unauth"); u.unauth = true; throw u; }
+  if (!txRes.ok) {
+    const d = await txRes.json().catch(() => ({}));
+    throw new Error(d.detail || "文字起こしの開始に失敗しました。");
+  }
+  return (await txRes.json()).job_id;
+}
+
+// presigned URL へ PUT。進捗を partLoaded[idx] に反映し、ETag を返す。
+function xhrPut(url, blob, idx, partLoaded, refresh) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", url);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) { partLoaded[idx] = e.loaded; refresh(); }
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        const etag = xhr.getResponseHeader("ETag");
+        if (!etag) { reject(new Error("ETagを取得できませんでした（R2のCORSで ExposeHeaders: ETag を許可してください）。")); return; }
+        resolve(etag);
+      } else {
+        reject(new Error("アップロード失敗 (HTTP " + xhr.status + ")"));
+      }
+    };
+    xhr.onerror = () => reject(new Error("ネットワークエラー"));
+    xhr.ontimeout = () => reject(new Error("タイムアウト"));
+    xhr.send(blob);
+  });
 }
 
 function poll() { pollTimer = setInterval(checkStatus, 1300); checkStatus(); }

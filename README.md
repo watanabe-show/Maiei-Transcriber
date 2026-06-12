@@ -61,7 +61,39 @@
 4. デプロイ完了後、表示されたURL（`https://xxx.onrender.com`）を共有
 
 > 無料枠は一定時間アクセスが無いとスリープし、次回アクセス時に十数秒の起動待ちがあります。
-> 大きい動画（数百MB）を扱う場合は、ローカル起動（使い方A）の方が安定します。
+> 大きい動画は、下の「大容量動画（2〜3GB）に対応する」を設定すると公開版でも安定して扱えます。
+> （未設定のままだと公開版のアップロード上限は数百MB程度。それ以上はローカル起動が安定）
+
+---
+
+## 大容量動画（2〜3GB）に対応する（任意・Cloudflare R2）
+
+公開版（使い方B）で**2〜3時間の動画**を扱いたい場合の設定です。設定すると、ブラウザから
+**Renderサーバーを経由せずクラウドストレージ（R2）へ動画を直接アップロード**し、サーバーは
+そこから音声だけを取り出して文字起こしします（Renderの無料枠ディスク/メモリを圧迫しません）。
+**未設定なら何も変わりません**（この機能は完全に任意）。
+
+> R2 は Cloudflare のストレージで、**読み出し（egress）が無料**＝この用途と相性が良く、無料枠（10GB）で足ります。
+> コードはS3互換なので Backblaze B2 / AWS S3 でも `S3_ENDPOINT` を変えるだけで使えます。
+
+### 手順
+1. **Cloudflare** に登録 → **R2** → バケットを作成（例 `transcriber-uploads`）
+2. **R2 APIトークン**（Object Read & Write）を発行 → `Access Key ID` と `Secret Access Key` を控える。
+   画面の「Account ID」からエンドポイント `https://<アカウントID>.r2.cloudflarestorage.com`
+3. バケットの **CORSポリシー** を設定（これが無いとブラウザから上げられません）:
+   - Allowed origins: 公開URL（`https://xxx.onrender.com`）と `http://localhost:8000`
+   - Allowed methods: `PUT`, `GET`
+   - Allowed headers: `*`
+   - **Expose headers: `ETag`**（分割アップロードに必須）
+4. （推奨）バケットの **オブジェクトライフサイクル** で「未完了の分割アップロードを1日で中断」「オブジェクトを1日で削除」を設定（消し忘れ防止の安全網）
+5. 環境変数を設定（Render ダッシュボード、ローカルなら `.env`）:
+   - `S3_ENDPOINT` … `https://<アカウントID>.r2.cloudflarestorage.com`
+   - `S3_BUCKET` … バケット名
+   - `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` … 控えた値
+   - `S3_REGION` … `auto`
+
+設定後、`DIRECT_UPLOAD_MAX_MB`（既定200MB）より大きいファイルは自動でこの直アップロード経路を使います。
+処理が終わるとアップロードした動画は自動削除されます。
 
 ---
 
@@ -80,8 +112,11 @@
 | `SECRET_KEY` | セッション署名鍵（公開時は必ず設定） | 起動毎ランダム |
 | `GROQ_MODEL` | `whisper-large-v3`（精度） / `-turbo`（高速） | `whisper-large-v3` |
 | `DEFAULT_LANGUAGE` | `ja` / `en` / 空欄=自動 | `ja` |
-| `MAX_UPLOAD_MB` | アップロード上限 | `300` |
+| `MAX_UPLOAD_MB` | サーバー経由アップロードの上限 | `300` |
 | `CHUNK_SECONDS` | 分割の長さ（秒） | `600` |
+| `S3_ENDPOINT` ほか | 大容量動画むけ R2 直アップロード（上記「大容量動画」節） | （なし=無効） |
+| `STORAGE_MAX_UPLOAD_MB` | 直アップロードの上限（R2有効時） | `3000` |
+| `DIRECT_UPLOAD_MAX_MB` | これ以下は従来のサーバー経由で送る閾値 | `200` |
 
 ## 困ったとき
 

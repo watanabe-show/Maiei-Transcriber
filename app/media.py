@@ -57,6 +57,11 @@ def transcode_and_segment(
         "-hide_banner",
         "-loglevel", "error",
         "-y",
+    ]
+    # ネットワーク入力（R2のpresigned URL等）は途中切断に備えて再接続を有効化する。
+    if input_path.startswith(("http://", "https://")):
+        cmd += ["-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"]
+    cmd += [
         "-i", input_path,
         "-vn",                       # 映像トラックを捨てる（動画→音声のみ）
         "-ac", "1",                  # モノラル

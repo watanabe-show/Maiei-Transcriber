@@ -29,7 +29,14 @@ _JOB_TTL_SECONDS = 60 * 60  # 1時間
 _SEMAPHORE = asyncio.Semaphore(2)
 
 
-def create_job(filename: str, workdir: str, input_path: str, language: str) -> str:
+def create_job(
+    filename: str, workdir: str, input_path: str, language: str, key: str | None = None
+) -> str:
+    """ジョブを作る。
+
+    input_path はローカルファイルパス、または R2 の presigned GET URL（ffmpegは両方扱える）。
+    key は R2 のオブジェクトキー。指定時は処理後に R2 から削除する。
+    """
     job_id = uuid.uuid4().hex
     JOBS[job_id] = {
         "id": job_id,
@@ -44,6 +51,7 @@ def create_job(filename: str, workdir: str, input_path: str, language: str) -> s
         "language": language,
         "_workdir": workdir,
         "_input_path": input_path,
+        "_key": key,                 # R2経由のときだけ入る（後始末用）
         "created": time.time(),
         "updated": time.time(),
     }
@@ -89,12 +97,27 @@ async def _run(job_id: str) -> None:
             _set(job, status="error", stage="エラー", error=str(exc))
         finally:
             shutil.rmtree(job.get("_workdir", ""), ignore_errors=True)
+            # R2経由ならアップロード済みオブジェクトを削除（成否によらず後始末）
+            key = job.get("_key")
+            if key:
+                try:
+                    from . import storage
+                    storage.delete(key)
+                except Exception:
+                    pass
 
 
 async def _process(job: dict) -> None:
     language = job["language"] or None
 
-    _set(job, status="processing", stage="音声に変換中…", progress=5)
+    # R2経由（大容量動画）は、ffmpegがURLから読み込むため変換に数分かかることがある。
+    # 文言で待ち時間の理由を伝える。
+    convert_stage = (
+        "動画から音声を取り出しています（大きい動画は数分かかります）…"
+        if job.get("_key")
+        else "音声に変換中…"
+    )
+    _set(job, status="processing", stage=convert_stage, progress=5)
     seg_dir = job["_workdir"] + "/chunks"
     files = await asyncio.to_thread(
         media.transcode_and_segment, job["_input_path"], seg_dir

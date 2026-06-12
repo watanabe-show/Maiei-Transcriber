@@ -40,7 +40,7 @@
 - 文字起こし結果の「切り方」を8種類から選べる（一文/5秒/10秒/30秒/1分/段落短/段落長/TimeCodeなし）。保存も選んだ切り方に連動。
 
 ## 最初にやってほしいこと
-1. `python scripts/smoke_test.py`（または .venv\Scripts\python.exe scripts\smoke_test.py）を実行して、今も21項目PASSするか確認し、結果を報告してください。
+1. `python scripts/smoke_test.py`（または .venv\Scripts\python.exe scripts\smoke_test.py）を実行して、今も28項目PASSするか確認し、結果を報告してください。
 2. その後で、私が次にやりたいことを伝えます。まだコードは変更しないでください。
 
 ==== ここまで ====

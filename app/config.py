@@ -51,6 +51,23 @@ TC_INTERVAL = float(_clean("TC_INTERVAL_SECONDS", "10"))  # 本文中にTCを入
 TARGET_SR = int(_clean("TARGET_SR", "16000"))            # 文字起こし用サンプルレート
 AUDIO_BITRATE = _clean("AUDIO_BITRATE", "32k")           # 圧縮ビットレート（mp3 mono）
 
+# --- 大容量動画むけ：クラウドストレージ直アップロード（任意機能 / S3互換=R2想定）---
+# 設定すると、大きいファイルはブラウザ→R2へ直接アップし、サーバーは presigned URL から
+# ffmpeg でストリーミング変換する。未設定なら従来どおりサーバー直アップロードのみで動く。
+S3_ENDPOINT = _clean("S3_ENDPOINT")              # 例: https://<accountid>.r2.cloudflarestorage.com
+S3_BUCKET = _clean("S3_BUCKET")
+S3_ACCESS_KEY_ID = _clean("S3_ACCESS_KEY_ID")
+S3_SECRET_ACCESS_KEY = _clean("S3_SECRET_ACCESS_KEY")
+S3_REGION = _clean("S3_REGION", "auto")
+# 4つの必須値が揃っていれば直アップロード機能が有効になる
+STORAGE_ENABLED = bool(S3_ENDPOINT and S3_BUCKET and S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY)
+
+STORAGE_MAX_UPLOAD_MB = int(_clean("STORAGE_MAX_UPLOAD_MB", "3000"))  # 直アップロードの上限(MB)
+DIRECT_UPLOAD_MAX_MB = int(_clean("DIRECT_UPLOAD_MAX_MB", "200"))     # これ以下は従来のサーバー直アップを使う閾値
+UPLOAD_PART_MB = int(_clean("UPLOAD_PART_MB", "64"))                  # multipart 1パートの大きさ(MB / 最小5)
+PRESIGN_PUT_EXPIRE = int(_clean("PRESIGN_PUT_EXPIRE", "21600"))       # パートPUT URLの有効期限(秒)=6h
+PRESIGN_GET_EXPIRE = int(_clean("PRESIGN_GET_EXPIRE", "21600"))       # GET URLの有効期限(秒)=6h
+
 # 受け付ける拡張子（音声＋動画）
 ALLOWED_EXT = {
     ".mp3", ".m4a", ".wav", ".aac", ".flac", ".ogg", ".oga", ".opus", ".wma",
