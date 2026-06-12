@@ -242,6 +242,32 @@ select:focus, input:focus { border-color: var(--vermilion); background: #fbf6e6;
 }
 .note b { color: var(--vermilion-d); font-weight: 800; }
 
+/* ---- 重要な注意書き（朱印・告知札風）---- */
+.caution {
+  position: relative;
+  font-size: 12.5px; line-height: 1.7; letter-spacing: .02em;
+  color: var(--ink);
+  background:
+    repeating-linear-gradient(45deg, rgba(168,53,31,.05) 0 9px, transparent 9px 18px),
+    rgba(168,53,31,.06);
+  border: 1.5px solid var(--vermilion);
+  box-shadow: 2px 2px 0 rgba(127,38,20,.28);
+  padding: 12px 15px; margin: 0 0 16px;
+}
+.caution .ttl {
+  display: block; color: var(--vermilion-d); font-weight: 800;
+  letter-spacing: .05em; font-size: 13.5px; margin-bottom: 4px;
+  font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
+}
+.caution a { color: var(--vermilion-d); font-weight: 800; text-decoration: underline; }
+.caution a:hover { color: var(--vermilion); }
+/* ログインカード内のコンパクト版 */
+.caution.sm {
+  max-width: 320px; margin: 18px auto 0; text-align: left;
+  font-size: 12px; padding: 10px 13px;
+}
+.caution.sm .ttl { font-size: 12.5px; }
+
 .muted { color: var(--ink-soft); }
 .small { font-size: 12.5px; }
 .hidden { display: none !important; }
