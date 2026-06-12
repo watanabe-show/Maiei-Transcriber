@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ログイン｜文字起こし</title>
+  <title>ログイン｜AD毎日専用 文字起こし</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
@@ -20,11 +20,15 @@
     <div class="login-card">
       <img class="crest" src="/images/imgi_2_no-img.png" alt="" />
       <p class="lead">MAIEI TRANSCRIBER</p>
-      <h1>文字起こし</h1>
+      <h1>AD毎日専用　文字起こし</h1>
+      <p class="launch-date">2026.06.12 起動</p>
       <p class="desc">音声・動画を文字起こしします。<br />パスワードを入力してください。</p>
 
       <form class="login-form" id="loginForm">
-        <input type="password" id="password" placeholder="パスワード" autocomplete="current-password" autofocus />
+        <div class="pw-field">
+          <input type="password" id="password" placeholder="パスワード" autocomplete="current-password" autofocus />
+          <button type="button" class="pw-toggle" id="pwToggle" aria-label="パスワードを表示">表示</button>
+        </div>
         <div class="login-err" id="err"></div>
         <button class="btn btn-stamp" type="submit">ログイン</button>
       </form>
@@ -41,6 +45,17 @@
   <div class="filmstrip"></div>
 
   <script>
+    // パスワードの表示／非表示を切り替える
+    const pwInput = document.getElementById('password');
+    const pwToggle = document.getElementById('pwToggle');
+    pwToggle.addEventListener('click', () => {
+      const show = pwInput.type === 'password';
+      pwInput.type = show ? 'text' : 'password';
+      pwToggle.textContent = show ? '隠す' : '表示';
+      pwToggle.setAttribute('aria-label', show ? 'パスワードを隠す' : 'パスワードを表示');
+      pwInput.focus();
+    });
+
     const form = document.getElementById('loginForm');
     const err = document.getElementById('err');
     form.addEventListener('submit', async (e) => {

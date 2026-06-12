@@ -165,12 +165,26 @@ body {
 
 label.field { font-size: 12px; letter-spacing: .14em; color: var(--ink-soft);
   display: flex; flex-direction: column; gap: 6px; }
-select, input[type="password"] {
+select, input[type="password"], input[type="text"] {
   font-family: inherit; font-size: 16px; color: var(--ink);
   background: #f6efdb; border: 1.5px solid var(--ink);
   padding: 11px 13px; outline: none;
 }
 select:focus, input:focus { border-color: var(--vermilion); background: #fbf6e6; }
+
+/* ---- パスワード表示切替 ---- */
+.pw-field { position: relative; }
+.pw-field input { padding-right: 58px; }
+.pw-toggle {
+  position: absolute; top: 50%; right: 8px; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer;
+  font-family: inherit; font-size: 12px; letter-spacing: .08em;
+  color: var(--vermilion-d); padding: 4px 6px;
+}
+.pw-toggle:hover { color: var(--vermilion); text-decoration: underline; }
+
+/* ---- 起動日（タイトル直下の小さな表記）---- */
+.launch-date { color: var(--ink-soft); font-size: 11px; letter-spacing: .14em; opacity: .82; margin: 2px 0 0; }
 
 /* ---- 進捗（現像中メーター）---- */
 .bar { height: 14px; background: #d3bd92; border: 1.5px solid var(--ink); overflow: hidden; }

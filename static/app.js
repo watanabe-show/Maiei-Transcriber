@@ -69,6 +69,7 @@ function handleFile(file) {
 async function startTranscription(file) {
   stopPolling();
   hide(resultPanel);
+  hide(uploadPanel);   // ファイル投入後はドラッグ＆ドロップ等を隠してインジケーターだけにする
   show(progressPanel);
   progressPanel.classList.remove("err-box");
   $("progressTitle").textContent = "アップロード中…";
@@ -262,6 +263,7 @@ function setProgress(pct, stage) {
 function fail(msg) {
   stopPolling();
   show(progressPanel);
+  show(uploadPanel);   // エラー時は再度ファイルを選べるよう入力エリアを戻す
   progressPanel.classList.add("err-box");
   $("progressTitle").textContent = "エラー";
   $("stage").textContent = msg;
@@ -359,6 +361,8 @@ $("dlSrt").addEventListener("click", () => download("srt"));
 
 $("againBtn").addEventListener("click", () => {
   hide(resultPanel); hide(fileBox);
+  hide(progressPanel); progressPanel.classList.remove("err-box");
+  show(uploadPanel);   // 入力エリア（ドラッグ＆ドロップ）を戻す
   fileInput.value = "";
   currentJobId = null; views = {};
   window.scrollTo({ top: 0, behavior: "smooth" });
