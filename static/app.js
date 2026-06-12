@@ -224,12 +224,15 @@ async function runMultipart(file, info) {
     );
   };
 
-  // 1パートをPUT（失効時はURL再発行、指数バックオフで最大4回再試行）
+  // 1パートをPUT。ERR_CONNECTION_RESET 等は断続的に起きる（後の試行で抜けることが多い）。
+  // 1パートでも諦めるとアップロード全体が失敗するため、URLを再発行しつつ
+  // 指数バックオフ＋ジッターで粘り強く再送する（回復可能な瞬断を取りこぼさない）。
+  const MAX_PART_RETRIES = 8;
   async function putPart(idx) {
     const start = idx * part_size;
     const blob = file.slice(start, Math.min(start + part_size, file.size));
     let lastErr = null;
-    for (let attempt = 0; attempt < 4; attempt++) {
+    for (let attempt = 0; attempt < MAX_PART_RETRIES; attempt++) {
       partLoaded[idx] = 0; refresh();
       try {
         etags[idx] = await xhrPut(partUrls[idx], blob, idx, partLoaded, refresh);
@@ -247,10 +250,13 @@ async function runMultipart(file, info) {
           if (r.status === 401) { const u = new Error("unauth"); u.unauth = true; throw u; }
           if (r.ok) { const j = await r.json(); partUrls[idx] = j.part_urls[String(idx + 1)] || partUrls[idx]; }
         } catch (e2) { if (e2 && e2.unauth) throw e2; }
-        await sleep(Math.min(1000 * 2 ** attempt, 8000));
+        // 再試行中であることを伝える（無音で固まったように見えないように）
+        $("stage").textContent = `通信が不安定なため再試行中…（パート${idx + 1} / ${attempt + 2}回目）`;
+        // 指数バックオフ＋ジッター（並列ワーカーが同じ瞬断を同時に踏むのを避ける）
+        await sleep(Math.min(1000 * 2 ** attempt, 10000) + Math.floor(Math.random() * 600));
       }
     }
-    throw lastErr || new Error("パートの送信に失敗しました。");
+    throw lastErr || new Error("パートの送信に失敗しました（通信が繰り返し切断されました）。");
   }
 
   // 並列3でパートを送信
