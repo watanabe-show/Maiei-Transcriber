@@ -14,7 +14,7 @@ import uuid
 
 import httpx
 
-from . import config, correct, formats, groq_client, media, vocab
+from . import config, formats, groq_client, media, vocab
 
 # 一時的な通信エラー（SSL bad record mac / 接続断 / タイムアウト等）。
 # これらは自動でリトライする（ウイルス対策のHTTPS検査や不安定回線で起きやすい）。
@@ -41,7 +41,7 @@ def create_job(
 
     input_path はローカルファイルパス、または R2 の presigned GET URL（ffmpegは両方扱える）。
     key は R2 のオブジェクトキー。指定時は処理後に R2 から削除する。
-    pack_id は語彙パックのID（指定時は Whisper prompt と校正に語彙を注入）。
+    pack_id は語彙パックのID（指定時は Whisper prompt に語彙を注入）。
     """
     job_id = uuid.uuid4().hex
     JOBS[job_id] = {
@@ -114,65 +114,14 @@ async def _run(job_id: str) -> None:
                     pass
 
 
-# ---------------------------------------------------------------- 校正（文章を整える）
-def start_polish(job_id: str) -> bool:
-    """完了済みジョブの本文を校正する背景タスクを開始する。"""
-    job = JOBS.get(job_id)
-    if job is None or job.get("status") != "done":
-        return False
-    if job.get("polish_status") == "processing":
-        return True   # すでに実行中
-    _set(
-        job,
-        polish_status="processing",
-        polish_progress=0,
-        polish_stage="整え中…",
-        polish_note=None,
-        polish_error=None,
-    )
-    task = asyncio.create_task(_run_polish(job_id))
-    job["_polish_task"] = task
-    return True
-
-
-async def _run_polish(job_id: str) -> None:
-    job = JOBS.get(job_id)
-    if job is None:
-        return
-    try:
-        segments = job.get("segments") or []
-        language = job["language"] or None
-        pack_id = job.get("_pack_id")
-
-        def cb(done: int, total: int) -> None:
-            job["polish_progress"] = int(100 * done / max(total, 1))
-            job["polish_stage"] = f"整え中… ({done}/{total})"
-            job["updated"] = time.time()
-
-        new_segments, note = await asyncio.to_thread(
-            correct.polish_segments, segments, language, pack_id, cb
-        )
-        views = formats.build_views(new_segments)
-        job["_polish_segments"] = new_segments   # ダウンロード用（フロントには送らない）
-        _set(
-            job,
-            polish_status="done",
-            polish_stage="完了",
-            polish_progress=100,
-            polish_views=views,
-            polish_text=formats.to_readable_text(views["plain"]),
-            polish_note=note,
-        )
-    except Exception as exc:  # 想定外はジョブに記録（元の結果は壊さない）
-        _set(job, polish_status="error", polish_error=str(exc))
-
-
 async def _process(job: dict) -> None:
     language = job["language"] or None       # 'ja'/'en'/None(自動判定)
     pack_id = job.get("_pack_id")
-    # ベースとなる Whisper prompt：語彙パックがあればそれを使い、無ければ
-    # 従来の句読点プライミング（auto時は None）。チャンクごとに前チャンク末尾を足す。
-    base_prompt = vocab.build_vocab_prompt(language, pack_id) or config.punct_prompt(language)
+    # ベースとなる Whisper prompt：語彙パックを「選んだとき」だけ、その固有名詞を渡す。
+    # 例文プライミングは廃止した（Whisper が prompt をそのまま書き起こしに混ぜてしまい、
+    # 無音区間などで例文が紛れ込む不具合があったため）。語彙パック未選択なら None＝prompt無し。
+    # チャンク間は、前チャンク末尾の「実際の文字起こし結果」だけを引き継ぐ（表記の連続性のため）。
+    base_prompt = vocab.build_vocab_prompt(language, pack_id)
 
     # R2経由（大容量動画）は、ffmpegがURLから読み込むため変換に数分かかることがある。
     # 文言で待ち時間の理由を伝える。
@@ -233,10 +182,6 @@ async def _process(job: dict) -> None:
         views=views,
         text=formats.to_readable_text(views["plain"]) if all_segments else "".join(text_parts).strip(),
     )
-
-
-def _joined_text(segments: list[dict]) -> str:
-    return "".join(seg["text"] for seg in segments).strip()
 
 
 async def _transcribe_with_retry(fpath: str, language, job: dict, prompt: str | None = None) -> dict:

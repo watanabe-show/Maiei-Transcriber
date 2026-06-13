@@ -19,38 +19,14 @@ GROQ_API_KEY = _clean("GROQ_API_KEY")
 GROQ_MODEL = _clean("GROQ_MODEL", "whisper-large-v3")
 GROQ_BASE_URL = _clean("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 
-# --- 校正LLM（「文章を整える」。Whisperとは別枠のチャットモデル）---
-# 表記ゆれ・変換ミスの修正だけに使う。Whisperの2,000回/日の枠とは別の枠で動く。
-# 既定は大型の openai/gpt-oss-120b（無料枠で利用可・補正品質が高め）。
-# 効きが悪い/不安定なら CORRECT_MODEL=llama-3.3-70b-versatile 等に変更して戻せる。
-CORRECT_MODEL = _clean("CORRECT_MODEL", "openai/gpt-oss-120b")
-
 # --- 文字起こしの既定言語 ("ja"=日本語, "en"=英語, ""=自動判定) ---
 DEFAULT_LANGUAGE = _clean("DEFAULT_LANGUAGE", "ja")
 
-# --- 句読点プライミング（prompt）---
-# Whisperは prompt の文体を真似る性質があり、句読点付きの例文を渡すと
-# 出力にも句読点が入りやすくなる。「一文ごと」の区切り精度を底上げする。
-# 言語自動判定(auto)時は言語を誤検出させないよう prompt を渡さない。
-PUNCT_PROMPT_JA = _clean(
-    "PUNCT_PROMPT_JA",
-    "以下は、日本語の音声を句読点を付けて書き起こしたものです。"
-    "こんにちは。今日は、よろしくお願いします。それでは、始めます。",
-)
-PUNCT_PROMPT_EN = _clean(
-    "PUNCT_PROMPT_EN",
-    "The following is a transcript with proper punctuation. "
-    "Hello. Thanks for joining today. Let's get started.",
-)
-
-
-def punct_prompt(language: str | None) -> str | None:
-    """言語に応じた句読点プライミング用 prompt を返す（auto/不明なら None）。"""
-    if language == "ja":
-        return PUNCT_PROMPT_JA or None
-    if language == "en":
-        return PUNCT_PROMPT_EN or None
-    return None
+# 注意：以前は「句読点プライミング」として例文（"こんにちは。…始めます。"等）を
+# Whisper の prompt に渡していたが、Whisper は prompt をそのまま出力に混ぜてしまう
+# （ハルシネーション）性質があり、無音区間などで例文がそのまま書き起こしに紛れ込む
+# 不具合が出た。このため例文プライミングは廃止した。固有名詞の補助が必要なときは
+# 「語彙パック」（vocab.py）を明示的に選んだ場合のみ prompt に語を注入する。
 
 # --- パスワード認証（複数人運用）---
 # APP_PASSWORD: 共有パスワード（1つ）

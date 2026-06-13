@@ -67,7 +67,7 @@ def list_packs() -> dict[str, list[dict]]:
 
 
 def pack_terms(lang: str | None, pack_id: str | None) -> list[str]:
-    """指定パックの term 配列を返す（無ければ空）。校正LLM・引き継ぎ抽出でも使う。"""
+    """指定パックの term 配列を返す（無ければ空）。build_vocab_prompt から使う。"""
     if not lang or not pack_id:
         return []
     pack = _PACKS.get(lang, {}).get(pack_id)
@@ -125,7 +125,7 @@ def tail_for_carryover(text: str | None, lang: str | None) -> str:
 def compose_prompt(lang: str | None, base: str | None, tail: str | None) -> str | None:
     """Whisper へ渡す最終 prompt を組み立てる。
 
-    base : 語彙パック由来の prompt（無ければ句読点プライミング等。Noneも可）。
+    base : 語彙パック由来の prompt（Noneも可）。
     tail : 前チャンクの末尾（表記連続性のため）。base の後ろに、上限の余白がある時だけ足す。
     最後に必ずトークン上限ガード（文字数）でクランプする。語彙パックが優先。
     """

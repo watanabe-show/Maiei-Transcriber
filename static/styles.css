@@ -213,6 +213,15 @@ select:focus, input:focus { border-color: var(--vermilion); background: #fbf6e6;
 .progress-head { display: flex; justify-content: space-between; align-items: baseline; }
 .progress-head .pct { font-weight: 800; font-size: 15px; }
 
+/* 待ち時間の「声かけ文言」：本筋の stage の下で、数秒ごとにふわっと切り替わる */
+.stage-flavor {
+  margin-top: 8px; min-height: 1.5em;
+  color: var(--vermilion-d); font-size: 13px; letter-spacing: .04em; font-style: italic;
+  opacity: 0; transition: opacity .5s ease;
+}
+.stage-flavor.show { opacity: .9; }
+.stage-flavor:empty { min-height: 0; }
+
 /* ---- 結果ヘッダ ---- */
 .result-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
 
@@ -341,9 +350,17 @@ select:focus, input:focus { border-color: var(--vermilion); background: #fbf6e6;
   font-family: "Yu Gothic", sans-serif;
   font-size: 12.5px; padding: 3px 9px; margin: 3px; border-radius: 3px; letter-spacing: .04em;
 }
-.help .warn { border-left: 4px solid var(--vermilion); background: rgba(168,53,31,.09); padding: 11px 14px; margin: 12px 0; font-size: 13.5px; }
 .help .ok2 { border-left: 4px solid var(--gold); background: rgba(156,122,51,.12); padding: 11px 14px; margin: 12px 0; font-size: 13.5px; }
 .help a { color: var(--vermilion-d); font-weight: 700; }
+/* 校正プロンプトのひな形（コピーして他AIへ渡す用）*/
+.help .prompt-box {
+  white-space: pre-wrap; word-break: break-word;
+  background: #f6efdb; border: 1.5px solid var(--ink);
+  padding: 14px 16px; margin: 10px 0 12px;
+  font-family: "Yu Gothic", "Hiragino Kaku Gothic ProN", "Noto Sans JP", monospace;
+  font-size: 13px; line-height: 1.75; color: var(--ink);
+  max-height: 46vh; overflow: auto;
+}
 
 /* ============================================================
    ログイン（トップページ）＝ ニュース映画タイトル風

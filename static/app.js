@@ -19,11 +19,7 @@ let selectedFile = null;     // 選択中のファイル（開始ボタンで送
 let selectedLang = "ja";     // 選択中の言語（ja=日本語 / en=英語 / auto=他言語）
 let selectedPack = "";       // 選択中の語彙パックID（""=選択しない）
 let APP_VOCAB = { ja: [], en: [] };   // /api/vocab で上書き（言語別の [{id,label}]）
-let originalViews = {};      // 校正前の views（「元に戻す」用）
-let polishedViews = null;    // 校正後の views（取得済みなら再呼び出し不要）
-let polished = false;        // いま校正版を表示しているか
-let polishNote = "";         // 校正時の警告（上限超過など）
-let polishPollTimer = null;
+let flavorTimer = null;      // 待ち時間の「声かけ文言」ローテーション用タイマー
 
 // サーバー設定（/api/config で上書き）。storage_enabled の時だけ大容量直アップ経路を使う。
 let APP_CONFIG = { storage_enabled: false, direct_max_mb: 200, storage_max_mb: 3000, part_mb: 64 };
@@ -152,6 +148,7 @@ async function startTranscription(file) {
   hide(uploadPanel);   // ファイル投入後はドラッグ＆ドロップ等を隠してインジケーターだけにする
   show(progressPanel);
   progressPanel.classList.remove("err-box");
+  startFlavor();       // 待ち時間の声かけ文言を回す
   $("progressTitle").textContent = "アップロード中…";
   setProgress(2, "ファイルを送信しています…");
 
@@ -350,12 +347,49 @@ function setProgress(pct, stage) {
 
 function fail(msg) {
   stopPolling();
+  stopFlavor();
   show(progressPanel);
   show(uploadPanel);   // エラー時は再度ファイルを選べるよう入力エリアを戻す
   progressPanel.classList.add("err-box");
   $("progressTitle").textContent = "エラー";
   $("stage").textContent = msg;
   toast("エラーが発生しました", "err");
+}
+
+// ---------------------------------------------------------------- 待ち時間の声かけ文言
+// アップロード〜文字起こしの待ち時間に、数秒ごとに励まし／豆知識を切り替えて
+// 「固まっていない（ちゃんと動いている）」ことを伝える。スマホゲームのマッチング画面風。
+// 文言は static/loading_lines.js（gitignore対象・任意）にあればそれを使い、無ければ下の汎用文言。
+const FALLBACK_FLAVOR = [
+  "音声を整えています…そのまま少々お待ちください。",
+  "AIが耳をすませています。長い音源ほど時間がかかります。",
+  "長い録音は自動で約10分ごとに分けて処理しています。",
+  "このまま別の作業をしていてもOKです（処理は続きます）。",
+  "固有名詞の精度を上げたいときは「語彙パック」を選んでみてください。",
+];
+function flavorLines() {
+  const ext = window.LOADING_LINES;
+  return (Array.isArray(ext) && ext.length) ? ext : FALLBACK_FLAVOR;
+}
+function startFlavor() {
+  stopFlavor();
+  const el = $("stageFlavor");
+  if (!el) return;
+  // 毎回同じ順にならないようシャッフルして順に表示
+  const lines = flavorLines().slice().sort(() => Math.random() - 0.5);
+  let i = 0;
+  const tick = () => {
+    el.textContent = lines[i % lines.length];
+    el.classList.remove("show"); void el.offsetWidth; el.classList.add("show");  // フェード再生
+    i++;
+  };
+  tick();
+  flavorTimer = setInterval(tick, 4500);
+}
+function stopFlavor() {
+  if (flavorTimer) { clearInterval(flavorTimer); flavorTimer = null; }
+  const el = $("stageFlavor");
+  if (el) { el.textContent = ""; el.classList.remove("show"); }
 }
 
 // ---------------------------------------------------------------- result
@@ -365,82 +399,13 @@ function renderResult(job) {
   if ((!views || !Object.keys(views).length) && job.text) {
     views = { plain: [{ start: 0, end: 0, text: job.text }] };
   }
-  originalViews = views;
-  polishedViews = null; polished = false; polishNote = "";
-  if (polishPollTimer) { clearInterval(polishPollTimer); polishPollTimer = null; }
+  stopFlavor();
   hide(progressPanel);
   show(resultPanel);
-  // 「文章を整える」は校正LLMが使える（APIキーあり）ときだけ表示
-  if (APP_CONFIG.correct_enabled) { show($("polishRow")); } else { hide($("polishRow")); }
-  show($("polishBtn")); hide($("revertBtn"));
-  $("polishBtn").disabled = false;
-  $("polishStatus").textContent = "";
   currentGran = $("gran").value || "sec10";
   updateGranDesc();
   renderView();
 }
-
-// ---------------------------------------------------------------- 文章を整える（校正LLM）
-function applyPolish(on) {
-  polished = on;
-  views = on ? polishedViews : originalViews;
-  renderView();
-  if (on) {
-    hide($("polishBtn")); show($("revertBtn"));
-    $("polishStatus").textContent = "✓ 整え済み（表記補正）" + (polishNote ? "／" + polishNote : "");
-  } else {
-    show($("polishBtn")); hide($("revertBtn"));
-    $("polishStatus").textContent = "";
-  }
-}
-
-async function startPolish() {
-  if (!currentJobId) return;
-  if (polishedViews) { applyPolish(true); return; }   // 取得済みなら再呼び出ししない
-  $("polishBtn").disabled = true;
-  $("polishStatus").textContent = "整え始めています…";
-  try {
-    const res = await fetch(`/api/jobs/${currentJobId}/polish`, { method: "POST" });
-    if (res.status === 401) { location.href = "/"; return; }
-    if (!res.ok) {
-      const d = await res.json().catch(() => ({}));
-      $("polishStatus").textContent = d.detail || "校正を開始できませんでした。";
-      $("polishBtn").disabled = false;
-      return;
-    }
-    polishPollTimer = setInterval(checkPolish, 1500);
-    checkPolish();
-  } catch (_) {
-    $("polishStatus").textContent = "サーバーに接続できませんでした。";
-    $("polishBtn").disabled = false;
-  }
-}
-
-async function checkPolish() {
-  if (!currentJobId) return;
-  try {
-    const res = await fetch(`/api/jobs/${currentJobId}`);
-    if (!res.ok) return;
-    const job = await res.json();
-    const st = job.polish_status;
-    if (st === "processing") {
-      $("polishStatus").textContent = job.polish_stage || "整え中…";
-    } else if (st === "done") {
-      clearInterval(polishPollTimer); polishPollTimer = null;
-      polishedViews = job.polish_views || {};
-      polishNote = job.polish_note || "";
-      $("polishBtn").disabled = false;
-      applyPolish(true);
-    } else if (st === "error") {
-      clearInterval(polishPollTimer); polishPollTimer = null;
-      $("polishStatus").textContent = "校正に失敗しました：" + (job.polish_error || "");
-      $("polishBtn").disabled = false;
-    }
-  } catch (_) { /* 次のpollで再試行 */ }
-}
-
-$("polishBtn").addEventListener("click", startPolish);
-$("revertBtn").addEventListener("click", () => applyPolish(false));
 
 // 選択中の切り方のブロック一覧を返す
 function currentList() {
@@ -509,10 +474,8 @@ $("copyBtn").addEventListener("click", async () => {
 function download(fmt) {
   if (!currentJobId) return;
   // テキスト・Word・Excel は選択中の切り方で保存（字幕srtは切り方の影響なし）。
-  // 「整え済み」を表示中なら、その校正本文でダウンロードする。
-  const pol = polished ? "&polished=1" : "";
   window.location.href =
-    `/api/jobs/${currentJobId}/download?fmt=${fmt}&gran=${encodeURIComponent(currentGran)}${pol}`;
+    `/api/jobs/${currentJobId}/download?fmt=${fmt}&gran=${encodeURIComponent(currentGran)}`;
 }
 $("dlTxt").addEventListener("click", () => download("txt"));
 $("dlDocx").addEventListener("click", () => download("docx"));
@@ -524,8 +487,7 @@ $("againBtn").addEventListener("click", () => {
   hide(progressPanel); progressPanel.classList.remove("err-box");
   show(uploadPanel);
   hide(confirmSection); show(pickSection);   // 入力エリア（ドラッグ＆ドロップ）に戻す
-  if (polishPollTimer) { clearInterval(polishPollTimer); polishPollTimer = null; }
-  polishedViews = null; polished = false;
+  stopFlavor();
   fileInput.value = ""; selectedFile = null;
   currentJobId = null; views = {};
   window.scrollTo({ top: 0, behavior: "smooth" });

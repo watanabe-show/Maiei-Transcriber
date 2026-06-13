@@ -100,6 +100,7 @@
       </div>
       <div class="bar"><span id="bar"></span></div>
       <div class="stage" id="stage">準備中…</div>
+      <div class="stage-flavor" id="stageFlavor"></div>
     </div>
 
     <!-- 結果 -->
@@ -121,12 +122,6 @@
         </label>
       </div>
       <div class="gran-desc" id="granDesc"></div>
-
-      <div class="row polish-row hidden" id="polishRow" style="margin-top:6px; align-items:center; gap:10px">
-        <button class="btn" id="polishBtn">✨ 文章を整える（固有名詞の表記補正）</button>
-        <button class="btn btn-ghost hidden" id="revertBtn">元に戻す</button>
-        <span class="small muted" id="polishStatus"></span>
-      </div>
 
       <div class="transcript" id="transcript"></div>
 
@@ -153,6 +148,8 @@
 
   <div class="toast" id="toast"></div>
   <div class="filmstrip"></div>
+  <!-- 待ち時間の「声かけ文言」（任意・gitignore対象）。無くても汎用文言で動く。 -->
+  <script src="/static/loading_lines.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>
