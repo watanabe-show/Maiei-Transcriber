@@ -70,7 +70,7 @@ def _fake_good(messages, **kw):
 def test_polish_applies_good_corrections_and_keeps_timestamps():
     correct.groq_client.chat_complete = _fake_good
     new, note = correct.polish_segments(_segs(), "ja", None)
-    assert note is None
+    assert note and "1か所を補正" in note     # 効果の見える化サマリ
     assert new[1]["text"] == "世界"          # 修正された
     assert new[0]["text"] == "こんにちは"      # 変えていない
     assert new[3]["text"] == "おわり"

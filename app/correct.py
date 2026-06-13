@@ -22,7 +22,8 @@ from typing import Callable
 from . import config, groq_client, vocab
 
 # 1バッチに詰めるセグメント本文の合計文字数の目安（TPMに収める）。
-BATCH_CHARS = 2000
+# gpt-oss-120b の無料TPMは8K程度なので、1回の呼び出しが収まるよう小さめにする。
+BATCH_CHARS = 1500
 # 1回の校正ジョブで許す最大バッチ数（≒LLM呼び出し回数。RPDの安全網）。
 MAX_BATCHES = 80
 # 429（レート制限）時の最大待機回数。
@@ -162,20 +163,19 @@ def polish_segments(
 
     terms = vocab.pack_terms(language, pack_id)
     batches = _batch_segments(segments)
-    total = len(batches)
-    note: str | None = None
-    if total > MAX_BATCHES:
-        note = (
-            f"本文が長いため、前半{MAX_BATCHES}ブロックのみ校正しました"
-            f"（無料枠保護のため）。残りは原文のままです。"
-        )
+    cap_note: str | None = None
+    if len(batches) > MAX_BATCHES:
+        cap_note = f"長文のため前半{MAX_BATCHES}ブロックのみ整えました（残りは原文）"
         batches = batches[:MAX_BATCHES]
+    total = len(batches)
 
     # 原文をコピーして、校正できた行だけ差し替える
     new_segments = [dict(s) for s in segments]
     confirmed: list[str] = []  # これまでに確定した表記（一貫性のため次バッチへ渡す）
 
     done = 0
+    changed = 0     # 実際に本文が変わったセグメント数
+    reverted = 0    # AI応答の形式が崩れて原文採用したブロック数
     for indices in batches:
         user_msg = _build_user_message(segments, indices, terms, confirmed)
         corrected = _correct_batch(user_msg, expected=len(indices))
@@ -183,13 +183,23 @@ def polish_segments(
             for n, i in enumerate(indices, start=1):
                 new_text = corrected.get(n)
                 if new_text:
+                    if new_text != (segments[i].get("text") or "").strip():
+                        changed += 1
                     new_segments[i]["text"] = new_text
                     # 語彙のうち出現した語を確定表記として蓄積
                     for t in _appeared_terms(new_text, terms):
                         if t not in confirmed:
                             confirmed.append(t)
+        else:
+            reverted += 1
         done += 1
         if progress_cb:
             progress_cb(done, total)
 
-    return new_segments, note
+    # 効果を見える化（“黙って捨てられていないか”の診断も兼ねる）
+    summary = [f"{changed}か所を補正" if changed else "補正箇所はありませんでした"]
+    if reverted:
+        summary.append(f"{reverted}/{total}ブロックはAIの応答形式が崩れ未反映")
+    if cap_note:
+        summary.append(cap_note)
+    return new_segments, "／".join(summary)

@@ -21,7 +21,9 @@ GROQ_BASE_URL = _clean("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 
 # --- 校正LLM（「文章を整える」。Whisperとは別枠のチャットモデル）---
 # 表記ゆれ・変換ミスの修正だけに使う。Whisperの2,000回/日の枠とは別の枠で動く。
-CORRECT_MODEL = _clean("CORRECT_MODEL", "llama-3.3-70b-versatile")
+# 既定は大型の openai/gpt-oss-120b（無料枠で利用可・補正品質が高め）。
+# 効きが悪い/不安定なら CORRECT_MODEL=llama-3.3-70b-versatile 等に変更して戻せる。
+CORRECT_MODEL = _clean("CORRECT_MODEL", "openai/gpt-oss-120b")
 
 # --- 文字起こしの既定言語 ("ja"=日本語, "en"=英語, ""=自動判定) ---
 DEFAULT_LANGUAGE = _clean("DEFAULT_LANGUAGE", "ja")
