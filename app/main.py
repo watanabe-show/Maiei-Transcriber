@@ -76,8 +76,8 @@ async def favicon() -> Response:
 
 @app.get("/help", response_class=HTMLResponse)
 async def help_page(request: Request) -> HTMLResponse:
-    page = "help.html" if _is_authed(request) else "login.html"
-    return HTMLResponse(_read_html(page))
+    # 使い方は機密情報を含まないので、ログイン前（ログイン画面の導線）からも見られるようにする
+    return HTMLResponse(_read_html("help.html"))
 
 
 # ---------------------------------------------------------------- auth API
