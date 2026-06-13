@@ -6,6 +6,7 @@
   <title>ログイン｜AD毎日専用 文字起こし</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
   <link rel="stylesheet" href="/static/styles.css" />
+  <script>try{if(localStorage.getItem('theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
 </head>
 <body>
   <div class="filmstrip"></div>
@@ -36,6 +37,7 @@
       <p class="boot-note">⏳ 初回アクセス時は、サーバーの起動まで十数秒かかる場合があります。</p>
 
       <a class="btn btn-ghost" href="/help" target="_blank" rel="noopener" style="margin-top:12px">📖 使い方を見る</a>
+      <button type="button" class="btn btn-ghost" data-theme-toggle style="margin-top:8px">🌙 ダーク</button>
 
       <div class="caution sm">
         <span class="ttl">！話し手の聞き分け（話者分離）はできません！</span>
@@ -75,5 +77,6 @@
       } catch (_) { err.textContent = '接続に失敗しました。'; }
     });
   </script>
+  <script src="/static/theme.js"></script>
 </body>
 </html>

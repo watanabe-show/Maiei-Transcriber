@@ -6,6 +6,7 @@
   <title>AD毎日専用 文字起こし</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
   <link rel="stylesheet" href="/static/styles.css" />
+  <script>try{if(localStorage.getItem('theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
 </head>
 <body>
   <div class="filmstrip"></div>
@@ -21,6 +22,7 @@
         </div>
       </div>
       <div class="nav">
+        <button type="button" class="btn btn-ghost" data-theme-toggle>🌙 ダーク</button>
         <a class="btn btn-ghost" href="/help" target="_blank" rel="noopener">使い方</a>
         <button class="btn btn-ghost" id="logoutBtn">ログアウト</button>
       </div>
@@ -151,5 +153,6 @@
   <!-- 待ち時間の「声かけ文言」（任意・gitignore対象）。無くても汎用文言で動く。 -->
   <script src="/static/loading_lines.js"></script>
   <script src="/static/app.js"></script>
+  <script src="/static/theme.js"></script>
 </body>
 </html>

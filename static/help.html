@@ -6,6 +6,7 @@
   <title>使い方｜AD毎日専用 文字起こし</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
   <link rel="stylesheet" href="/static/styles.css" />
+  <script>try{if(localStorage.getItem('theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
 </head>
 <body>
   <div class="filmstrip"></div>
@@ -16,7 +17,10 @@
         <img class="crest" src="/images/imgi_2_no-img.png" alt="" />
         <div class="titles"><h1>使い方ガイド</h1></div>
       </div>
-      <button type="button" class="btn btn-stamp js-close">✕ このタブを閉じる</button>
+      <div class="nav">
+        <button type="button" class="btn btn-ghost" data-theme-toggle>🌙 ダーク</button>
+        <button type="button" class="btn btn-stamp js-close">✕ このタブを閉じる</button>
+      </div>
     </div>
 
     <!-- 概要 -->
@@ -244,5 +248,6 @@
       }
     });
   </script>
+  <script src="/static/theme.js"></script>
 </body>
 </html>

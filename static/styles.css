@@ -15,11 +15,63 @@
   --film:       #14100a;   /* フィルム黒 */
   --line:       #b39a6c;
   --shadow:     rgba(33,26,17,.28);
+  /* ↓ 面・コントロールの地色（ダークテーマで丸ごと切り替えるための変数）*/
+  --field-bg:    #f6efdb;   /* 入力欄・プルダウン・原稿の地色 */
+  --field-bg-f:  #fbf6e6;   /* フォーカス時 */
+  --btn-1:       #f3e9cf;   /* ボタン上 */
+  --btn-2:       #e0cda4;   /* ボタン下 */
+  --btn-1h:      #f7efd9;   /* ボタンhover上 */
+  --btn-2h:      #e6d3aa;   /* ボタンhover下 */
+  --bar-track:   #d3bd92;   /* 進捗バーの地 */
+  --surface-2:   #f2e8cf;   /* ファイル行など */
+  --drop-hover:  #f1e7cf;   /* 投入口hover */
+  --on-vermilion:#f6efdb;   /* 朱地の上の文字 */
+  --hard-shadow: var(--ink);/* 活版風ハードシャドウ */
+  --panel-hi:    rgba(255,255,255,.5);  /* パネル上端のハイライト */
+  --frame-line:  rgba(33,26,17,.25);    /* パネル内側の罫線 */
+}
+
+/* ============================================================
+   ダークテーマ（暗室・ネガ調）。<html data-theme="dark"> で切替。
+   変数を上書きするだけで全体が反転する設計。
+   ============================================================ */
+html[data-theme="dark"] {
+  --paper:       #1b1610;
+  --paper-2:     #241e16;
+  --paper-edge:  #2e2619;
+  --ink:         #ece0c6;
+  --ink-soft:    #b6a684;
+  --vermilion:   #d4604a;
+  --vermilion-d: #c14e38;
+  --gold:        #c2a056;
+  --gold-lt:     #d8bd78;
+  --film:        #0b0906;
+  --line:        #463a26;
+  --shadow:      rgba(0,0,0,.55);
+  --field-bg:    #221b13;
+  --field-bg-f:  #2c2418;
+  --btn-1:       #2f2719;
+  --btn-2:       #241d12;
+  --btn-1h:      #3a3120;
+  --btn-2h:      #2e2616;
+  --bar-track:   #2a2218;
+  --surface-2:   #2a2317;
+  --drop-hover:  #2a2318;
+  --hard-shadow: #000;
+  --panel-hi:    rgba(255,255,255,.05);
+  --frame-line:  rgba(236,224,198,.10);
 }
 
 * { box-sizing: border-box; }
 
 html, body { margin: 0; }
+
+/* テーマ切り替えをその場でなめらかに */
+body, .panel, .transcript, select, input, .fileitem, .bar, .lang-group,
+.drop, .note, .caution, .login-card, .news-hero, .toast {
+  transition: background-color .25s ease, color .25s ease,
+              border-color .25s ease, box-shadow .25s ease;
+}
 
 body {
   color: var(--ink);
@@ -103,12 +155,12 @@ body {
     linear-gradient(0deg, rgba(255,255,255,.10), rgba(255,255,255,.10)),
     var(--paper-2);
   border: 1px solid var(--line);
-  box-shadow: 0 1px 0 #fff8 inset, 0 6px 22px var(--shadow);
+  box-shadow: 0 1px 0 var(--panel-hi) inset, 0 6px 22px var(--shadow);
   padding: 24px; margin-bottom: 22px;
 }
 .panel::after {
   content: ""; position: absolute; inset: 7px;
-  border: 1px solid rgba(33,26,17,.25); pointer-events: none;
+  border: 1px solid var(--frame-line); pointer-events: none;
 }
 .panel > * { position: relative; }
 
@@ -123,15 +175,15 @@ body {
   appearance: none; cursor: pointer;
   font-family: inherit; font-weight: 800; font-size: 14px; letter-spacing: .12em;
   color: var(--ink);
-  background: linear-gradient(180deg, #f3e9cf, #e0cda4);
+  background: linear-gradient(180deg, var(--btn-1), var(--btn-2));
   border: 1.5px solid var(--ink);
   padding: 10px 18px;
-  box-shadow: 2px 2px 0 var(--ink);
+  box-shadow: 2px 2px 0 var(--hard-shadow);
   transition: transform .06s, box-shadow .06s, background .15s;
 }
-.btn:hover { background: linear-gradient(180deg, #f7efd9, #e6d3aa); }
-.btn:active { transform: translate(2px,2px); box-shadow: 0 0 0 var(--ink); }
-.btn:disabled { opacity: .5; cursor: not-allowed; box-shadow: 2px 2px 0 var(--ink); }
+.btn:hover { background: linear-gradient(180deg, var(--btn-1h), var(--btn-2h)); }
+.btn:active { transform: translate(2px,2px); box-shadow: 0 0 0 var(--hard-shadow); }
+.btn:disabled { opacity: .5; cursor: not-allowed; box-shadow: 2px 2px 0 var(--hard-shadow); }
 
 .btn-stamp {
   color: #fff;
@@ -153,7 +205,7 @@ body {
   padding: 42px 20px; text-align: center; cursor: pointer;
   transition: .15s; position: relative;
 }
-.drop:hover, .drop.drag { border-color: var(--vermilion); background-color: #f1e7cf; }
+.drop:hover, .drop.drag { border-color: var(--vermilion); background-color: var(--drop-hover); }
 .drop .reel { font-size: 44px; line-height: 1; filter: sepia(.3); }
 .drop .big { font-size: 18px; font-weight: 800; letter-spacing: .12em; margin: 10px 0 4px; }
 .drop .hint { font-size: 12.5px; color: var(--ink-soft); letter-spacing: .04em; }
@@ -167,10 +219,10 @@ label.field { font-size: 12px; letter-spacing: .14em; color: var(--ink-soft);
   display: flex; flex-direction: column; gap: 6px; }
 select, input[type="password"], input[type="text"] {
   font-family: inherit; font-size: 16px; color: var(--ink);
-  background: #f6efdb; border: 1.5px solid var(--ink);
+  background: var(--field-bg); border: 1.5px solid var(--ink);
   padding: 11px 13px; outline: none;
 }
-select:focus, input:focus { border-color: var(--vermilion); background: #fbf6e6; }
+select:focus, input:focus { border-color: var(--vermilion); background: var(--field-bg-f); }
 
 /* ---- パスワード表示切替 ---- */
 .pw-field { position: relative; display: block; }
@@ -191,19 +243,19 @@ select:focus, input:focus { border-color: var(--vermilion); background: #fbf6e6;
 /* ---- 言語選択（セグメントボタン）---- */
 .lang-pick { margin-top: 18px; }
 .lang-label { font-size: 12px; letter-spacing: .14em; color: var(--ink-soft); margin-bottom: 8px; }
-.lang-group { display: inline-flex; border: 1.5px solid var(--ink); background: #f6efdb; }
+.lang-group { display: inline-flex; border: 1.5px solid var(--ink); background: var(--field-bg); }
 .lang-btn {
   font-family: inherit; font-size: 15px; letter-spacing: .1em; color: var(--ink);
   background: transparent; cursor: pointer; border: none;
   border-right: 1.5px solid var(--ink); padding: 11px 24px; transition: background .15s, color .15s;
 }
 .lang-btn:last-child { border-right: none; }
-.lang-btn:hover { background: #fbf6e6; }
-.lang-btn.active { background: var(--vermilion); color: #f6efdb; font-weight: 700; }
+.lang-btn:hover { background: var(--field-bg-f); }
+.lang-btn.active { background: var(--vermilion); color: var(--on-vermilion); font-weight: 700; }
 .lang-note { margin-top: 10px; font-size: 12.5px; color: var(--ink-soft); letter-spacing: .02em; line-height: 1.6; }
 
 /* ---- 進捗（現像中メーター）---- */
-.bar { height: 14px; background: #d3bd92; border: 1.5px solid var(--ink); overflow: hidden; }
+.bar { height: 14px; background: var(--bar-track); border: 1.5px solid var(--ink); overflow: hidden; }
 .bar > span {
   display: block; height: 100%; width: 0;
   background: repeating-linear-gradient(45deg, var(--vermilion) 0 10px, var(--vermilion-d) 10px 20px);
@@ -244,7 +296,7 @@ select:focus, input:focus { border-color: var(--vermilion); background: #fbf6e6;
 .transcript {
   background:
     linear-gradient(90deg, transparent 0 38px, rgba(168,53,31,.35) 38px 39px, transparent 39px),
-    #f6efdb;
+    var(--field-bg);
   border: 1.5px solid var(--ink);
   padding: 18px 18px 18px 52px;
   max-height: 58vh; overflow: auto;
@@ -316,7 +368,7 @@ select:focus, input:focus { border-color: var(--vermilion); background: #fbf6e6;
 .filelist { margin-top: 16px; }
 .fileitem {
   display: flex; align-items: center; gap: 12px;
-  background: #f2e8cf; border: 1.5px solid var(--ink); padding: 11px 14px; font-size: 14px;
+  background: var(--surface-2); border: 1.5px solid var(--ink); padding: 11px 14px; font-size: 14px;
 }
 .fileitem .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
 .fileitem .size { color: var(--ink-soft); font-size: 12px; }
@@ -355,7 +407,7 @@ select:focus, input:focus { border-color: var(--vermilion); background: #fbf6e6;
 /* 校正プロンプトのひな形（コピーして他AIへ渡す用）*/
 .help .prompt-box {
   white-space: pre-wrap; word-break: break-word;
-  background: #f6efdb; border: 1.5px solid var(--ink);
+  background: var(--field-bg); border: 1.5px solid var(--ink);
   padding: 14px 16px; margin: 10px 0 12px;
   font-family: "Yu Gothic", "Hiragino Kaku Gothic ProN", "Noto Sans JP", monospace;
   font-size: 13px; line-height: 1.75; color: var(--ink);
@@ -419,3 +471,21 @@ select:focus, input:focus { border-color: var(--vermilion); background: #fbf6e6;
   .login-card h1 { font-size: 24px; }
   .transcript { padding-left: 44px; font-size: 15.5px; }
 }
+
+/* ============================================================
+   ダークテーマの個別調整（変数だけでは賄えない箇所）
+   ============================================================ */
+/* 背景：暖色の地紋を暗室向けの淡い暈し＋ビネットに差し替え */
+html[data-theme="dark"] body {
+  background-image:
+    radial-gradient(1100px 520px at 50% -180px, rgba(212,96,74,.10), transparent 70%),
+    radial-gradient(circle at 18% 12%, rgba(0,0,0,.30), transparent 45%),
+    radial-gradient(circle at 82% 80%, rgba(0,0,0,.34), transparent 50%),
+    repeating-linear-gradient(0deg, rgba(255,232,188,.022) 0 2px, transparent 2px 4px);
+}
+/* ロゴは黒地に黒絵柄。明：紙に multiply で馴染ませる／暗：反転して白抜きに */
+html[data-theme="dark"] .brand .crest { filter: invert(1); mix-blend-mode: screen; }
+/* ログインの円形ロゴは、暗背景でも明るい円の中に黒絵柄が出るよう薄地を敷く */
+html[data-theme="dark"] .login-card .crest { background: #e7dcc4; mix-blend-mode: multiply; }
+/* ヒーロー写真は少し沈めて夜の編集室の質感に */
+html[data-theme="dark"] .news-hero img { filter: sepia(.45) contrast(1.04) brightness(.82); }
