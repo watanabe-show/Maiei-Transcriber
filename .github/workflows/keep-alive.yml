@@ -1,0 +1,15 @@
+name: Keep Render Alive
+
+on:
+  schedule:
+    # 日〜金 9:00〜24:00 JST (= UTC 0:00〜15:00, day-of-week 0=Sun,5=Fri)
+    - cron: '*/5 0-14 * * 0-5'
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" \
+            https://voice-transcriber-t2cz.onrender.com/login
