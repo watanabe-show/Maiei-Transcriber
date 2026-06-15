@@ -64,6 +64,20 @@
 > 大きい動画は、下の「大容量動画（2〜3GB）に対応する」を設定すると公開版でも安定して扱えます。
 > （未設定のままだと公開版のアップロード上限は数百MB程度。それ以上はローカル起動が安定）
 
+### スリープを防ぐ（GitHub Actions keep-alive）
+
+`.github/workflows/keep-alive.yml` を追加すると、指定した時間帯に GitHub Actions が5分ごとに
+アプリへpingを送り、Render のスリープを防ぎます。
+
+```yaml
+on:
+  schedule:
+    - cron: '*/5 0-14 * * 0-5'  # 日〜金 9:00〜24:00 JST
+```
+
+曜日・時間帯は `cron` 式を書き換えてください（時刻は UTC。JST = UTC+9）。
+GitHub Actions の無料枠（月2,000分）をほぼ消費しません（1回1秒未満）。
+
 ---
 
 ## 大容量動画（2〜3GB）に対応する（任意・Cloudflare R2）
