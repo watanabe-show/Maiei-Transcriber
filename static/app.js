@@ -43,6 +43,32 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   populateVocab(selectedLang);
 })();
 
+// ---------------------------------------------------------------- 今月の使用量
+// 「今月これだけ文字起こしした」を出すだけ。上限（分母）は出さない：
+// Groqには月あたりの時間上限が無く、「X / Y」と書くと存在しない上限を発明することになる。
+function fmtHm(sec) {
+  const total = Math.max(0, Math.round(sec / 60));   // 分に丸める
+  const h = Math.floor(total / 60), m = total % 60;
+  if (h === 0) return `${m}分`;
+  return m === 0 ? `${h}時間` : `${h}時間${m}分`;
+}
+
+async function refreshUsage() {
+  const line = $("usageLine");
+  if (!line) return;
+  try {
+    const res = await fetch("/api/usage");
+    if (!res.ok) return;                      // 未ログイン等は黙って出さない
+    const u = await res.json();
+    $("usageValue").textContent = fmtHm(u.groq_seconds || 0);
+    // ローカル保存のときは再起動で消えることを添える（公開版はR2に残る）
+    $("usageNote").textContent =
+      u.backend === "local" ? "（この端末の記録。再起動で消えます）" : "";
+    line.classList.remove("hidden");
+  } catch (_) { /* 取得できなければ表示しないだけ */ }
+}
+refreshUsage();
+
 // ---------------------------------------------------------------- utils
 function toast(msg, kind = "") {
   const t = $("toast");
@@ -402,6 +428,7 @@ function renderResult(job) {
   stopFlavor();
   hide(progressPanel);
   show(resultPanel);
+  refreshUsage();      // いま終わったぶんを反映する
   currentGran = $("gran").value || "sec10";
   updateGranDesc();
   renderView();

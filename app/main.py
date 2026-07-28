@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import config, documents, formats, jobs, storage, vocab
+from . import config, documents, formats, jobs, meters, storage, vocab
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.dirname(BASE_DIR)
@@ -113,6 +113,22 @@ async def api_vocab(request: Request) -> JSONResponse:
     """語彙パックの一覧（言語別 [{id,label}]）を返す。フロントの選択肢に使う。"""
     _require_auth(request)
     return JSONResponse(vocab.list_packs())
+
+
+@app.get("/api/usage")
+async def api_usage(request: Request) -> JSONResponse:
+    """今月の文字起こし時間（秒）を返す。
+
+    上限は返さない。Groqには「月あたり何時間まで」という上限が無いので、
+    分母を付けると存在しない上限を発明することになる（表示は実績だけ）。
+    """
+    _require_auth(request)
+    data = await meters.read()
+    return JSONResponse({
+        "year_month": data.get("year_month"),
+        "groq_seconds": data.get("groq_seconds") or 0.0,
+        "backend": meters.backend(),
+    })
 
 
 @app.post("/api/transcribe")

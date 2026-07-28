@@ -13,6 +13,12 @@ os.environ.setdefault("GROQ_API_KEY", "")
 os.environ.setdefault("APP_PASSWORD", "test123")
 os.environ.setdefault("DEFAULT_LANGUAGE", "ja")
 
+# R2(S3互換)を必ず無効にする。.env に本番のキーが入っている環境でテストを走らせると、
+# 使用量台帳が本番バケットへ書き込まれてしまうため（load_dotenv は既存の環境変数を
+# 上書きしないので、空文字を先に置けばローカルJSON側の経路が使われる）。
+for _k in ("S3_ENDPOINT", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"):
+    os.environ[_k] = ""
+
 # プロジェクトルートを import パスに追加
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -164,6 +170,29 @@ docx_plain = documents.build_docx(views["plain"], title="t", show_tc=False)
 check("Word(TimeCodeなし)が生成される", docx_plain[:2] == b"PK" and len(docx_plain) > 2000)
 xlsx_lbl = documents.build_xlsx(b5, segs_time, body_label="本文（5秒ごと）")
 check("Excel(切り方ラベル付)が生成される", xlsx_lbl[:2] == b"PK" and len(xlsx_lbl) > 2000)
+
+print("=== 7. 使用量メーター（今月の文字起こし時間）===")
+from app import meters  # noqa: E402
+
+check("テスト中はR2を使わない(ローカル保存)", meters.backend() == "local", meters.backend())
+
+import re  # noqa: E402
+
+check("月キーが YYYY-MM 形式", bool(re.fullmatch(r"\d{4}-\d{2}", meters.month_key())),
+      meters.month_key())
+
+# 台帳の実体はテスト用の一時ディレクトリへ逃がす（プロジェクトを汚さない）
+meters.LOCAL_DIR = os.path.join(work, "meters")
+asyncio.run(meters.add_groq_seconds(90))
+asyncio.run(meters.add_groq_seconds(30))
+led = asyncio.run(meters.read())
+check("加算が積み上がる(上書きでなく差分加算)", abs(led["groq_seconds"] - 120.0) < 0.01,
+      f"{led['groq_seconds']}秒")
+
+r = client.get("/api/usage")
+check("/api/usage が今月の秒数を返す",
+      r.status_code == 200 and r.json().get("groq_seconds") == 120.0,
+      f"status={r.status_code} body={r.text[:80]}")
 
 print("\n=== 結果 ===")
 print(f"  成功 {sum(results)} / {len(results)}")

@@ -128,6 +128,23 @@ def abort(key: str, upload_id: str) -> None:
         pass
 
 
+def get_bytes(key: str) -> bytes | None:
+    """小さなオブジェクトを丸ごと読む。存在しなければ None（使用量台帳に使う）。"""
+    try:
+        resp = _client().get_object(Bucket=config.S3_BUCKET, Key=key)
+        return resp["Body"].read()
+    except Exception:
+        # 未作成（初月）も含めて「無い」として扱う。呼び出し側でゼロ始まりになる。
+        return None
+
+
+def put_bytes(key: str, data: bytes) -> None:
+    """小さなオブジェクトを丸ごと書く（使用量台帳に使う）。"""
+    _client().put_object(
+        Bucket=config.S3_BUCKET, Key=key, Body=data, ContentType="application/json"
+    )
+
+
 def delete(key: str) -> None:
     """オブジェクトを削除する（処理後の後始末。失敗しても無視）。"""
     try:

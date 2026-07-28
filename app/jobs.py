@@ -14,7 +14,7 @@ import uuid
 
 import httpx
 
-from . import config, formats, groq_client, media, vocab
+from . import config, formats, groq_client, media, meters, vocab
 
 # 一時的な通信エラー（SSL bad record mac / 接続断 / タイムアウト等）。
 # これらは自動でリトライする（ウイルス対策のHTTPS検査や不安定回線で起きやすい）。
@@ -59,6 +59,7 @@ def create_job(
         "_input_path": input_path,
         "_key": key,                 # R2経由のときだけ入る（後始末用）
         "_pack_id": pack_id,         # 語彙パックID（未選択なら None）
+        "_billed_seconds": 0.0,      # 文字起こしした音声の長さ（使用量台帳へ計上する）
         "created": time.time(),
         "updated": time.time(),
     }
@@ -112,6 +113,11 @@ async def _run(job_id: str) -> None:
                     storage.delete(key)
                 except Exception:
                     pass
+            # 使用量台帳へ「ここまでに文字起こしした長さ」を1回だけ書く。
+            # 途中でエラーになっても、実際に呼んだ分はGroq側で消費されているので計上する。
+            # タイマーで定期的に書かないのは、Renderの無料枠が夜間スリープするため
+            # ＝プロセスが落ちる前に確実に書き終えている必要があるから。
+            await meters.add_groq_seconds(job.get("_billed_seconds") or 0.0)
 
 
 async def _process(job: dict) -> None:
@@ -169,6 +175,10 @@ async def _process(job: dict) -> None:
         # 実際のチャンク長で次のオフセットを進める（タイムスタンプのズレを防ぐ）
         duration = float(result.get("duration") or 0.0)
         offset += duration if duration > 0 else float(config.CHUNK_SECONDS)
+
+        # 使用量台帳へ計上する分（チャンクごとに積む。書き込みはジョブ終了時に1回だけ）。
+        # duration が取れなかった時は 0 のまま＝水増しせず少なめに数える。
+        job["_billed_seconds"] = float(job.get("_billed_seconds") or 0.0) + duration
 
     # 全ての切り方（一文ごと/秒ごと/段落/TimeCodeなし）のブロックを一度に作る
     views = formats.build_views(all_segments)

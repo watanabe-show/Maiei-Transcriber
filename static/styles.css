@@ -333,6 +333,21 @@ select:focus, input:focus { border-color: var(--vermilion); background: var(--fi
 }
 .note b { color: var(--vermilion-d); font-weight: 800; }
 
+/* ---- 今月の使用量（実績のみ・上限は出さない）---- */
+.usage {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  font-size: 12.5px; color: var(--ink-soft); letter-spacing: .02em;
+  border-top: 1px dotted var(--gold);
+  padding: 7px 2px 0; margin: -8px 0 16px;
+}
+.usage-label {
+  font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
+  letter-spacing: .08em;
+}
+.usage-label::after { content: "："; }
+.usage-value { color: var(--ink); font-weight: 800; font-size: 13.5px; }
+.usage-note { font-size: 11.5px; opacity: .75; }
+
 /* ---- 重要な注意書き（朱印・告知札風）---- */
 .caution {
   position: relative;
