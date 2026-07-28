@@ -354,6 +354,10 @@ select:focus, input:focus { border-color: var(--vermilion); background: var(--fi
   font-size: 13px; color: var(--ink); line-height: 1.6;
 }
 .switch input { width: 17px; height: 17px; accent-color: var(--vermilion-d); cursor: pointer; }
+.speaker-pick {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin: 10px 0 0; padding-left: 26px;
+}
 
 /* ---- 重要な注意書き（朱印・告知札風）---- */
 .caution {

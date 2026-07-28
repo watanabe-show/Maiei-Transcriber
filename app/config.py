@@ -27,8 +27,9 @@ GLADIA_ENABLED = bool(GLADIA_API_KEY)
 GLADIA_MONTHLY_LIMIT_SECONDS = int(float(_clean("GLADIA_MONTHLY_LIMIT_HOURS", "10")) * 3600)
 # 1リクエストの上限は135分/1000MB（公式）。安全側に少し手前で止める。
 GLADIA_MAX_JOB_SECONDS = int(_clean("GLADIA_MAX_JOB_SECONDS", "7800"))   # 130分
-# 対談前提：発話量の上位N話者だけ残し、少数ラベルは最近接へ統合する（過検出対策）
-GLADIA_KEEP_SPEAKERS = int(_clean("GLADIA_KEEP_SPEAKERS", "2"))
+# 画面で選べる話者の人数。0＝おまかせ（Gladiaの判定をそのまま使う）
+GLADIA_SPEAKER_CHOICES = (0, 2, 3, 4, 5)
+GLADIA_MAX_SPEAKERS = max(GLADIA_SPEAKER_CHOICES)
 
 # --- 文字起こしの既定言語 ("ja"=日本語, "en"=英語, ""=自動判定) ---
 DEFAULT_LANGUAGE = _clean("DEFAULT_LANGUAGE", "ja")

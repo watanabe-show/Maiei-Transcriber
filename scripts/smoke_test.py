@@ -216,8 +216,12 @@ check("utterancesをsegments形に直せる", len(gsegs) == 4 and gsegs[0]["spea
 check("billing_timeを実績として取れる", gladia_client.billing_seconds(fake_result) == 840.0)
 
 merged = gladia_client.merge_minor_speakers(gsegs, keep=2)
-check("過検出の少数話者が上位2人へ統合される",
+check("人数を2人と指定すると上位2人へ統合される",
       len({s["speaker"] for s in merged}) == 2, f"{sorted({s['speaker'] for s in merged})}")
+auto = gladia_client.merge_minor_speakers(gsegs, keep=0)
+check("おまかせ(0)はGladiaの判定に触らない",
+      [s["speaker"] for s in auto] == [s["speaker"] for s in gsegs],
+      f"{sorted({s['speaker'] for s in auto})}")
 
 # --- 話者が変わったら必ずブロックが切れる ---
 blocks = formats.build_blocks(merged, "para_meaning")
@@ -261,6 +265,12 @@ check("/api/usage が話者分離の残量を返す",
 r = client.get("/api/config")
 check("キー未設定なら話者分離を出さない",
       r.json().get("diarize_enabled") is False, r.text[:90])
+
+# --- 人数の指定は想定外の値を「おまかせ」に倒す ---
+from app.main import _speaker_count  # noqa: E402
+
+check("人数は選択肢の値だけ通す",
+      (_speaker_count("3"), _speaker_count("9"), _speaker_count("あ"), _speaker_count("")) == (3, 0, 0, 0))
 
 print("\n=== 結果 ===")
 print(f"  成功 {sum(results)} / {len(results)}")

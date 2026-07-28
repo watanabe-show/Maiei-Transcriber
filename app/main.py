@@ -59,6 +59,15 @@ def _want_diarize(value: str) -> bool:
     return config.GLADIA_ENABLED and str(value).strip().lower() in ("1", "true", "on", "yes")
 
 
+def _speaker_count(value: str) -> int:
+    """話し手の人数。想定外の値は 0（おまかせ）に倒す。"""
+    try:
+        n = int(str(value).strip() or 0)
+    except ValueError:
+        return 0
+    return n if n in config.GLADIA_SPEAKER_CHOICES else 0
+
+
 def _read_html(name: str) -> str:
     with open(os.path.join(STATIC_DIR, name), encoding="utf-8") as fh:
         return fh.read()
@@ -150,7 +159,7 @@ async def api_usage(request: Request) -> JSONResponse:
 @app.post("/api/transcribe")
 async def transcribe(
     request: Request, file: UploadFile, language: str = Form(""), pack_id: str = Form(""),
-    diarize: str = Form(""),
+    diarize: str = Form(""), speakers: str = Form(""),
 ) -> JSONResponse:
     _require_auth(request)
 
@@ -199,6 +208,7 @@ async def transcribe(
     job_id = jobs.create_job(
         filename, workdir, input_path, lang,
         pack_id=pack_id.strip() or None, diarize=_want_diarize(diarize),
+        speakers=_speaker_count(speakers),
     )
     jobs.start(job_id)
     return JSONResponse({"job_id": job_id})
@@ -273,6 +283,8 @@ async def app_config(request: Request) -> JSONResponse:
         # 話者分離はキーがある時だけ。false ならフロントはトグルを出さない
         "diarize_enabled": config.GLADIA_ENABLED,
         "diarize_max_minutes": int(config.GLADIA_MAX_JOB_SECONDS / 60),
+        "diarize_speaker_choices": list(config.GLADIA_SPEAKER_CHOICES),
+        "diarize_max_speakers": config.GLADIA_MAX_SPEAKERS,
     })
 
 
@@ -377,6 +389,7 @@ async def transcribe_key(
     language: str = Form(""),
     pack_id: str = Form(""),
     diarize: str = Form(""),
+    speakers: str = Form(""),
 ) -> JSONResponse:
     """R2にアップ済みのオブジェクト(key)を文字起こしする。
 
@@ -402,7 +415,7 @@ async def transcribe_key(
     workdir = tempfile.mkdtemp(prefix="tx_")
     job_id = jobs.create_job(
         filename, workdir, get_url, lang, key=key, pack_id=pack_id.strip() or None,
-        diarize=_want_diarize(diarize),
+        diarize=_want_diarize(diarize), speakers=_speaker_count(speakers),
     )
     jobs.start(job_id)
     return JSONResponse({"job_id": job_id})

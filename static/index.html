@@ -40,7 +40,7 @@
         ふだんの利用ならほぼ¥0です。
       </div>
       <div class="usage hidden" id="usageLine">
-        <span class="usage-label">今月の文字起こし</span>
+        <span class="usage-label">今月このアプリで文字起こしした音声</span>
         <span class="usage-value" id="usageValue">—</span>
         <span class="usage-note" id="usageNote"></span>
       </div>
@@ -99,8 +99,20 @@
           <div class="lang-label">話し手の聞き分け（話者分離）</div>
           <label class="switch">
             <input type="checkbox" id="diarizeToggle" />
-            <span>話者ごとに「話者1／話者2」を付ける</span>
+            <span>話者ごとにラベルを付ける</span>
           </label>
+          <div class="speaker-pick hidden" id="speakerPick">
+            <label class="field field-row">話し手の人数
+              <select id="speakerCount">
+                <option value="0" selected>おまかせ</option>
+                <option value="2">2人</option>
+                <option value="3">3人</option>
+                <option value="4">4人</option>
+                <option value="5">5人</option>
+              </select>
+            </label>
+            <span class="usage-note" id="speakerNote"></span>
+          </div>
           <div class="lang-note" id="diarizeNote">
             ONにすると別のAI（Gladia）で処理します。無料枠が月10時間までなので、
             使うぶんだけ残りが減ります。OFFなら今までどおりです。

@@ -19,6 +19,7 @@ let selectedFile = null;     // 選択中のファイル（開始ボタンで送
 let selectedLang = "ja";     // 選択中の言語（ja=日本語 / en=英語 / auto=他言語）
 let selectedPack = "";       // 選択中の語彙パックID（""=選択しない）
 let useDiarize = false;      // 話者分離モード（Gladia経路）を使うか
+let selectedSpeakers = "0";  // 話し手の人数（"0"=おまかせ）
 let APP_VOCAB = { ja: [], en: [] };   // /api/vocab で上書き（言語別の [{id,label}]）
 let flavorTimer = null;      // 待ち時間の「声かけ文言」ローテーション用タイマー
 
@@ -41,9 +42,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const caution = $("diarizeCaution");
     if (caution) {
       caution.innerHTML =
-        '<span class="ttl">話し手の聞き分け（話者分離）が使えます</span>'
-        + '下の「話者分離」をONにすると、話者ごとに「話者1／話者2」を付けて書き起こします。'
-        + '無料枠は月10時間までで、残りは上に出ています。';
+        '<span class="ttl">🎉話し手の聞き分け（話者分離）が使えます🎉</span>'
+        + `ONにすると「話者1〜${APP_CONFIG.diarize_max_speakers}」で書き起こし。`
+        + '無料枠は月10時間…なので早い者勝ちです。';
     }
     const foot = $("footEngine");
     if (foot) {
@@ -83,7 +84,8 @@ async function refreshUsage() {
     $("usageValue").textContent = fmtHm(u.groq_seconds || 0);
     // ローカル保存のときは再起動で消えることを添える（公開版はR2に残る）
     $("usageNote").textContent =
-      u.backend === "local" ? "（この端末の記録。再起動で消えます）" : "";
+      "（利用者全員の合計・上限なし）"
+      + (u.backend === "local" ? "　※この端末の記録。再起動で消えます" : "");
     line.classList.remove("hidden");
 
     // 話者分離は上限つき（無料10時間/月）なので、こちらは残量まで出す
@@ -183,8 +185,25 @@ function populateVocab(lang) {
   $("vocabPick").style.display = packs.length ? "" : "none";
 }
 $("vocabPack").addEventListener("change", () => { selectedPack = $("vocabPack").value; });
+const SPEAKER_NOTE = {
+  "0": "Gladiaが判定した人数をそのまま使います。実質2人でも細かく割れることがあります。",
+  "2": "対談向け。発話の少ないラベルは近い話者へまとめます。",
+  "3": "司会＋ゲスト2名など。",
+  "4": "座談会など。",
+  "5": "大人数の会議など。",
+};
+function updateSpeakerNote() {
+  $("speakerNote").textContent = SPEAKER_NOTE[$("speakerCount").value] || "";
+}
 $("diarizeToggle").addEventListener("change", () => {
   useDiarize = $("diarizeToggle").checked;
+  // 人数はONのときだけ意味を持つので、それに合わせて出し入れする
+  $("speakerPick").classList.toggle("hidden", !useDiarize);
+  updateSpeakerNote();
+});
+$("speakerCount").addEventListener("change", () => {
+  selectedSpeakers = $("speakerCount").value;
+  updateSpeakerNote();
 });
 
 $("startBtn").addEventListener("click", () => {
@@ -231,6 +250,7 @@ async function uploadDirect(file) {
   body.append("language", selectedLang);
   body.append("pack_id", selectedPack);
   body.append("diarize", useDiarize ? "1" : "");
+  body.append("speakers", selectedSpeakers);
   const res = await fetch("/api/transcribe", { method: "POST", body });
   if (res.status === 401) { location.href = "/"; return null; }
   if (!res.ok) {
@@ -352,6 +372,7 @@ async function runMultipart(file, info) {
   body.append("language", selectedLang);
   body.append("pack_id", selectedPack);
   body.append("diarize", useDiarize ? "1" : "");
+  body.append("speakers", selectedSpeakers);
   const txRes = await fetch("/api/transcribe-key", { method: "POST", body });
   if (txRes.status === 401) { const u = new Error("unauth"); u.unauth = true; throw u; }
   if (!txRes.ok) {

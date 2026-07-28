@@ -63,9 +63,17 @@ def upload(path: str) -> str:
     return audio_url
 
 
-def request_transcription(audio_url: str, language: str | None, vocab: list[str] | None) -> str:
-    """文字起こしを依頼して id を返す。"""
+def request_transcription(audio_url: str, language: str | None, vocab: list[str] | None,
+                          speakers: int = 0) -> str:
+    """文字起こしを依頼して id を返す。
+
+    speakers>0 のとき人数のヒントを渡す。ただし2026-07-23の実測ではこのヒントは
+    効かなかった（指定しても5ラベルに割れた）ので、人数の保証は
+    merge_minor_speakers（受け取った後の統合）側で行う。
+    """
     payload: dict = {"audio_url": audio_url, "diarization": True}
+    if speakers > 0:
+        payload["diarization_config"] = {"number_of_speakers": speakers}
     if language:
         payload["language_config"] = {"languages": [language]}
     if vocab:
@@ -117,10 +125,11 @@ def poll_result(job_id: str, timeout_seconds: float = 1800.0,
 
 
 def transcribe_file(path: str, language: str | None = None,
-                    vocab: list[str] | None = None, on_wait=None) -> dict:
+                    vocab: list[str] | None = None, on_wait=None,
+                    speakers: int = 0) -> dict:
     """1ファイルを話者分離つきで文字起こしする（upload→依頼→待ち を一括）。"""
     audio_url = upload(path)
-    job_id = request_transcription(audio_url, language, vocab)
+    job_id = request_transcription(audio_url, language, vocab, speakers)
     return poll_result(job_id, on_wait=on_wait)
 
 
@@ -158,13 +167,16 @@ def billing_seconds(result: dict) -> float:
 
 
 def merge_minor_speakers(segments: list[dict], keep: int) -> list[dict]:
-    """話者の過検出をならす（対談前提）。
+    """話者の過検出をならす。
 
     Gladiaは実質2人の対談でも5ラベル程度に割ることがある（2026-07-23 実測）。
     発話の長さ上位 keep 人だけを残し、それ以外のラベルは
     **時間的にいちばん近い採用話者**へ寄せる（前後の発話に吸収させる）。
 
-    keep 以下しか話者がいなければ何もしない。
+    **keep=0（＝画面の「おまかせ」）のときは何もしない**＝Gladiaの判定をそのまま出す。
+    実測データが2026-07-23の1件しか無い状態で「何秒未満は雑音」といった閾値を
+    決めても推測にしかならないため、自動のならしは持たせていない。
+    keep 以下しか話者がいない場合も何もしない。
     """
     if keep <= 0 or not segments:
         return segments

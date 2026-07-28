@@ -37,6 +37,7 @@ def create_job(
     key: str | None = None,
     pack_id: str | None = None,
     diarize: bool = False,
+    speakers: int = 0,
 ) -> str:
     """ジョブを作る。
 
@@ -61,6 +62,7 @@ def create_job(
         "_key": key,                 # R2経由のときだけ入る（後始末用）
         "_pack_id": pack_id,         # 語彙パックID（未選択なら None）
         "_diarize": diarize,         # True なら話者分離モード（Gladia経路）
+        "_speakers": speakers,       # 話し手の人数（0=おまかせ＝Gladiaの判定のまま）
         "_billed_seconds": 0.0,      # 文字起こしした音声の長さ（使用量台帳へ計上する）
         "_reserved_seconds": 0.0,    # Gladiaで先に確保した秒数（実績が出たら補正する）
         "diarized": diarize,         # フロントへ返す（結果画面の表示切替用）
@@ -179,15 +181,17 @@ async def _process_diarized(job: dict) -> None:
         _set(job, stage=f"話者を聞き分けています…（{int(elapsed)}秒経過）",
              progress=min(90, 15 + int(elapsed)))
 
+    speakers = int(job.get("_speakers") or 0)
     terms = vocab.pack_terms(job["language"] or None, job.get("_pack_id"))
     result = await asyncio.to_thread(
-        gladia_client.transcribe_file, audio_path, language, terms or None, _on_wait
+        gladia_client.transcribe_file, audio_path, language, terms or None, _on_wait, speakers
     )
 
     segments = gladia_client.to_segments(result)
     if not segments:
         raise RuntimeError("文字起こし結果が空でした（無音の可能性があります）。")
-    segments = gladia_client.merge_minor_speakers(segments, config.GLADIA_KEEP_SPEAKERS)
+    # 人数を指定された時だけ、少数ラベルを近い話者へ寄せる（0=おまかせは触らない）
+    segments = gladia_client.merge_minor_speakers(segments, speakers)
 
     actual = gladia_client.billing_seconds(result)
     if actual > 0:
