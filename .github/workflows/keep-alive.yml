@@ -6,8 +6,11 @@ on:
     # Render無料枠は「稼働時間」750h/月（ワークスペース共通）。夜間と土日は寝かせて消費を抑える。
     # 着地の見込み = 12h/日 × 約22平日 ≒ 264h/月（従来は24/7で744h＝ほぼ上限だった）。
     # spin-downは15分無アクセスで起きるので、間隔は15分未満なら足りる。
-    # */5 にしているのは Actions の schedule が混雑時に間引かれる（2〜3時間飛ぶ）ぶんの保険。
-    - cron: '*/5 1-12 * * 1-5'
+    # 5分間隔なのは Actions の schedule が混雑時に間引かれる（2〜3時間飛ぶ）ぶんの保険。
+    # 0分始まりでなく3分始まりにしているのは、毎時0分が Actions の高負荷時間帯で
+    # キューごとdropされうると公式が明記しているため（"High load times include the
+    # start of every hour... some queued jobs may be dropped"）。
+    - cron: '3-58/5 1-12 * * 1-5'
   workflow_dispatch:        # 手動実行（すぐ起こしたいとき・疎通確認用）
 
 jobs:
