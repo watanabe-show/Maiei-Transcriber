@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import glob
 import os
+import re
 import shutil
 import subprocess
 
@@ -37,6 +38,62 @@ def ffmpeg_exe() -> str:
     return _FFMPEG_CACHE
 
 
+def _network_input_args(input_path: str) -> list[str]:
+    """ネットワーク入力（R2のpresigned URL等）は途中切断に備えて再接続を有効化する。"""
+    if input_path.startswith(("http://", "https://")):
+        return ["-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"]
+    return []
+
+
+def transcode_single(input_path: str, out_path: str, target_sr: int = config.TARGET_SR,
+                     bitrate: str = config.AUDIO_BITRATE) -> str:
+    """入力を 16kHz mono mp3 の**1ファイル**に変換する（分割しない）。
+
+    話者分離（Gladia）用。話者IDを音声全体で一貫させるため丸ごと1本で送る必要があり、
+    10分ごとの分割（transcode_and_segment）は使えない。
+    130分でも 32kbps なら 30MB 程度なので、Gladiaの1000MB制限には十分収まる。
+    """
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    cmd = [ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y"]
+    cmd += _network_input_args(input_path)
+    cmd += [
+        "-i", input_path,
+        "-vn",                       # 映像トラックを捨てる
+        "-ac", "1",                  # モノラル
+        "-ar", str(target_sr),
+        "-c:a", "libmp3lame",
+        "-b:a", bitrate,
+        out_path,
+    ]
+    proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if proc.returncode != 0 or not os.path.exists(out_path):
+        tail = (proc.stderr or "").strip()[-1500:]
+        raise RuntimeError(
+            "音声の変換に失敗しました。ファイルが壊れているか、対応していない形式の可能性があります。\n"
+            f"ffmpeg: {tail}"
+        )
+    return out_path
+
+
+def probe_duration(path: str) -> float:
+    """音声・動画の長さ（秒）を返す。取れなければ 0.0。
+
+    ffprobe は使えない（imageio-ffmpeg は ffmpeg 本体しか同梱していない）。
+    ffmpeg に入力だけ与えると、ヘッダを読んだ時点で情報を stderr に出して終了するので、
+    そこから "Duration: HH:MM:SS.ss" を拾う。
+    """
+    proc = subprocess.run(
+        [ffmpeg_exe(), "-hide_banner", "-i", path],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+    )
+    # 出力先を与えていないので ffmpeg は必ず非ゼロ終了する。stderr だけを見る。
+    m = re.search(r"Duration:\s*(\d+):(\d{2}):(\d{2})\.(\d+)", proc.stderr or "")
+    if not m:
+        return 0.0
+    h, mm, ss, frac = m.groups()
+    return int(h) * 3600 + int(mm) * 60 + int(ss) + float("0." + frac)
+
+
 def transcode_and_segment(
     input_path: str,
     out_dir: str,
@@ -58,9 +115,7 @@ def transcode_and_segment(
         "-loglevel", "error",
         "-y",
     ]
-    # ネットワーク入力（R2のpresigned URL等）は途中切断に備えて再接続を有効化する。
-    if input_path.startswith(("http://", "https://")):
-        cmd += ["-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"]
+    cmd += _network_input_args(input_path)
     cmd += [
         "-i", input_path,
         "-vn",                       # 映像トラックを捨てる（動画→音声のみ）

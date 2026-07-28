@@ -19,6 +19,17 @@ GROQ_API_KEY = _clean("GROQ_API_KEY")
 GROQ_MODEL = _clean("GROQ_MODEL", "whisper-large-v3")
 GROQ_BASE_URL = _clean("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 
+# --- Gladia (話者分離モード。任意機能：キーが無ければトグル自体を出さない) ---
+GLADIA_API_KEY = _clean("GLADIA_API_KEY")
+GLADIA_BASE_URL = _clean("GLADIA_BASE_URL", "https://api.gladia.io/v2")
+GLADIA_ENABLED = bool(GLADIA_API_KEY)
+# 無料枠は10時間/月。1秒も超えないよう、送信前にこの値でハード遮断する。
+GLADIA_MONTHLY_LIMIT_SECONDS = int(float(_clean("GLADIA_MONTHLY_LIMIT_HOURS", "10")) * 3600)
+# 1リクエストの上限は135分/1000MB（公式）。安全側に少し手前で止める。
+GLADIA_MAX_JOB_SECONDS = int(_clean("GLADIA_MAX_JOB_SECONDS", "7800"))   # 130分
+# 対談前提：発話量の上位N話者だけ残し、少数ラベルは最近接へ統合する（過検出対策）
+GLADIA_KEEP_SPEAKERS = int(_clean("GLADIA_KEEP_SPEAKERS", "2"))
+
 # --- 文字起こしの既定言語 ("ja"=日本語, "en"=英語, ""=自動判定) ---
 DEFAULT_LANGUAGE = _clean("DEFAULT_LANGUAGE", "ja")
 

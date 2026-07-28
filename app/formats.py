@@ -203,11 +203,49 @@ def group_breath(segments: list[dict], gap: float = 0.8) -> list[dict]:
     return paras
 
 
+def speaker_label(speaker) -> str:
+    """0始まりの話者番号を「話者1」の形にする。"""
+    return f"話者{int(speaker) + 1}"
+
+
+def has_speakers(segments: list[dict]) -> bool:
+    """話者分離つきの結果か（話者分離モードで作られた segments か）。"""
+    return any(s.get("speaker") is not None for s in segments)
+
+
+def _runs_by_speaker(segments: list[dict]) -> list[list[dict]]:
+    """同じ話者が続く区間ごとに segments を分ける。"""
+    runs: list[list[dict]] = []
+    for seg in segments:
+        if runs and runs[-1][0].get("speaker") == seg.get("speaker"):
+            runs[-1].append(seg)
+        else:
+            runs.append([seg])
+    return runs
+
+
 def build_blocks(segments: list[dict], gran: str = DEFAULT_GRAN) -> list[dict]:
     """「切り方(gran)」に応じてブロック（先頭にTimeCodeを付ける単位）を作る。
 
     "plain"（TimeCodeなし）は段落区切りを返す（表示側で時間を出さない）。
+
+    話者分離つきの結果では、**話者が変わったら必ず区切る**（別人の発言が
+    1ブロックに混ざらないように）。切り方ごとのまとめ方（group_*）には手を入れず、
+    先に話者の連続区間へ割ってから各区間に適用する。話者情報が無い場合は
+    従来と完全に同じ経路を通る。
     """
+    if has_speakers(segments):
+        blocks: list[dict] = []
+        for run in _runs_by_speaker(segments):
+            for b in _build_blocks_one(run, gran):
+                b["speaker"] = run[0].get("speaker")
+                blocks.append(b)
+        blocks.sort(key=lambda b: b["start"])
+        return blocks
+    return _build_blocks_one(segments, gran)
+
+
+def _build_blocks_one(segments: list[dict], gran: str = DEFAULT_GRAN) -> list[dict]:
     gran = _GRAN_ALIASES.get(gran, gran)  # 旧キー(para_short/long)を新キーへ
     if gran == "sentence":
         return group_sentences(segments)
@@ -232,16 +270,26 @@ def build_views(segments: list[dict]) -> dict[str, list[dict]]:
 
 
 # ---------------------------------------------------------------- text outputs
+def body_text(block: dict) -> str:
+    """本文。話者分離つきなら「話者1：」を頭に付ける。"""
+    text = (block.get("text") or "").strip()
+    if not text:
+        return ""
+    if block.get("speaker") is None:
+        return text
+    return f"{speaker_label(block['speaker'])}：{text}"
+
+
 def to_readable_text(paragraphs: list[dict]) -> str:
     """段落区切り・TCなしの読みやすい本文。"""
-    return "\n\n".join(p["text"].strip() for p in paragraphs if p["text"].strip())
+    return "\n\n".join(t for t in (body_text(p) for p in paragraphs) if t)
 
 
 def to_readable_text_tc(blocks: list[dict]) -> str:
     """各ブロックの先頭に [HH:MM:SS] を付けた本文（約10秒ごと）。"""
     lines = []
     for b in blocks:
-        text = b["text"].strip()
+        text = body_text(b)
         if not text:
             continue
         lines.append(f"[{hhmmss(b['start'])}] {text}")
@@ -252,7 +300,7 @@ def to_srt(segments: list[dict]) -> str:
     blocks = []
     idx = 1
     for seg in segments:
-        text = (seg.get("text") or "").strip()
+        text = body_text(seg)
         if not text:
             continue
         start = _fmt_timestamp(seg["start"], comma=True)
@@ -265,7 +313,7 @@ def to_srt(segments: list[dict]) -> str:
 def to_vtt(segments: list[dict]) -> str:
     out = ["WEBVTT", ""]
     for seg in segments:
-        text = (seg.get("text") or "").strip()
+        text = body_text(seg)
         if not text:
             continue
         start = _fmt_timestamp(seg["start"], comma=False)
@@ -292,7 +340,10 @@ def render_text(segments: list[dict], fmt: str, gran: str = "") -> tuple[str, st
         return to_readable_text_tc(group_time_blocks(segments)), "txt", "text/plain; charset=utf-8"
 
     # fmt == "txt": 切り方に従う
+    # "plain" も build_blocks を通す（話者分離つきのとき話者ごとに区切るため。
+    #  話者情報が無い場合 build_blocks("plain") は group_paragraphs と同一）
     gran = gran or "plain"
+    blocks = build_blocks(segments, gran)
     if gran == "plain":
-        return to_readable_text(group_paragraphs(segments)), "txt", "text/plain; charset=utf-8"
-    return to_readable_text_tc(build_blocks(segments, gran)), "txt", "text/plain; charset=utf-8"
+        return to_readable_text(blocks), "txt", "text/plain; charset=utf-8"
+    return to_readable_text_tc(blocks), "txt", "text/plain; charset=utf-8"

@@ -14,7 +14,7 @@ import uuid
 
 import httpx
 
-from . import config, formats, groq_client, media, meters, vocab
+from . import config, formats, gladia_client, groq_client, media, meters, vocab
 
 # 一時的な通信エラー（SSL bad record mac / 接続断 / タイムアウト等）。
 # これらは自動でリトライする（ウイルス対策のHTTPS検査や不安定回線で起きやすい）。
@@ -36,6 +36,7 @@ def create_job(
     language: str,
     key: str | None = None,
     pack_id: str | None = None,
+    diarize: bool = False,
 ) -> str:
     """ジョブを作る。
 
@@ -59,7 +60,10 @@ def create_job(
         "_input_path": input_path,
         "_key": key,                 # R2経由のときだけ入る（後始末用）
         "_pack_id": pack_id,         # 語彙パックID（未選択なら None）
+        "_diarize": diarize,         # True なら話者分離モード（Gladia経路）
         "_billed_seconds": 0.0,      # 文字起こしした音声の長さ（使用量台帳へ計上する）
+        "_reserved_seconds": 0.0,    # Gladiaで先に確保した秒数（実績が出たら補正する）
+        "diarized": diarize,         # フロントへ返す（結果画面の表示切替用）
         "created": time.time(),
         "updated": time.time(),
     }
@@ -113,14 +117,101 @@ async def _run(job_id: str) -> None:
                     storage.delete(key)
                 except Exception:
                     pass
-            # 使用量台帳へ「ここまでに文字起こしした長さ」を1回だけ書く。
-            # 途中でエラーになっても、実際に呼んだ分はGroq側で消費されているので計上する。
+            # 使用量台帳へ「ここまでに使った長さ」を1回だけ書く。
+            # 途中でエラーになっても、実際に呼んだ分は相手側で消費されているので計上する。
             # タイマーで定期的に書かないのは、Renderの無料枠が夜間スリープするため
             # ＝プロセスが落ちる前に確実に書き終えている必要があるから。
-            await meters.add_groq_seconds(job.get("_billed_seconds") or 0.0)
+            if job.get("_diarize"):
+                # Gladiaは送信前に枠を確保済み。実績（billing_time）との差だけ補正する。
+                delta = (job.get("_billed_seconds") or 0.0) - (job.get("_reserved_seconds") or 0.0)
+                await meters.adjust("gladia", delta)
+            else:
+                await meters.add_seconds("groq", job.get("_billed_seconds") or 0.0)
+
+
+def _fmt_hm(seconds: float) -> str:
+    total = max(0, int(round(seconds / 60)))
+    h, m = divmod(total, 60)
+    if h == 0:
+        return f"{m}分"
+    return f"{h}時間" if m == 0 else f"{h}時間{m}分"
+
+
+async def _process_diarized(job: dict) -> None:
+    """話者分離モード（Gladia）。
+
+    Groqの10分分割は使わない。話者IDを音声全体で一貫させるため、
+    1本のmp3にまとめて丸ごと送る。
+    """
+    language = job["language"] or None
+    limit = float(config.GLADIA_MONTHLY_LIMIT_SECONDS)
+
+    _set(job, status="processing", stage="音声に変換中…", progress=5)
+    audio_path = job["_workdir"] + "/full.mp3"
+    await asyncio.to_thread(media.transcode_single, job["_input_path"], audio_path)
+
+    # 送る前に長さを測る。変換はローカルで無料なので、ここで測ってから
+    # 「課金される呼び出し」を止めれば無料枠を1秒も超えない。
+    duration = await asyncio.to_thread(media.probe_duration, audio_path)
+    if duration <= 0:
+        raise RuntimeError("音声の長さを判定できませんでした。ファイルを確認してください。")
+    if duration > config.GLADIA_MAX_JOB_SECONDS:
+        raise RuntimeError(
+            f"話者分離は1ファイル{int(config.GLADIA_MAX_JOB_SECONDS / 60)}分までです"
+            f"（この音声は約{_fmt_hm(duration)}）。分割してからお試しください。"
+        )
+
+    # 残量の確認と確保を同時に行う（別々にすると同時実行で上限を超える）
+    _set(job, stage="無料枠の残りを確認中…", progress=8)
+    ok, used = await meters.try_reserve("gladia", duration, limit)
+    if not ok:
+        raise RuntimeError(
+            f"今月の話者分離の無料枠（{_fmt_hm(limit)}）が足りません。"
+            f"使用済み {_fmt_hm(used)} ／ 残り {_fmt_hm(max(0.0, limit - used))}、"
+            f"この音声は約{_fmt_hm(duration)}です。来月まで待つか、短く分けてお試しください。"
+        )
+    job["_reserved_seconds"] = duration
+    job["_billed_seconds"] = duration     # 実績が取れたら下で上書きする
+
+    _set(job, stage="話者を聞き分けています…", progress=15)
+
+    def _on_wait(elapsed: float) -> None:
+        _set(job, stage=f"話者を聞き分けています…（{int(elapsed)}秒経過）",
+             progress=min(90, 15 + int(elapsed)))
+
+    terms = vocab.pack_terms(job["language"] or None, job.get("_pack_id"))
+    result = await asyncio.to_thread(
+        gladia_client.transcribe_file, audio_path, language, terms or None, _on_wait
+    )
+
+    segments = gladia_client.to_segments(result)
+    if not segments:
+        raise RuntimeError("文字起こし結果が空でした（無音の可能性があります）。")
+    segments = gladia_client.merge_minor_speakers(segments, config.GLADIA_KEEP_SPEAKERS)
+
+    actual = gladia_client.billing_seconds(result)
+    if actual > 0:
+        job["_billed_seconds"] = actual
+
+    views = formats.build_views(segments)
+    speakers = sorted({s["speaker"] for s in segments})
+    _set(
+        job,
+        status="done",
+        stage=f"完了（{len(speakers)}人の話者を検出）",
+        progress=100,
+        segments=segments,
+        views=views,
+        text=formats.to_readable_text(views["plain"]),
+        speaker_count=len(speakers),
+    )
 
 
 async def _process(job: dict) -> None:
+    if job.get("_diarize"):
+        await _process_diarized(job)
+        return
+
     language = job["language"] or None       # 'ja'/'en'/None(自動判定)
     pack_id = job.get("_pack_id")
     # ベースとなる Whisper prompt：語彙パックを「選んだとき」だけ、その固有名詞を渡す。

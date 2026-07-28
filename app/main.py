@@ -50,6 +50,15 @@ def _require_auth(request: Request) -> None:
         raise HTTPException(status_code=401, detail="ログインが必要です。")
 
 
+def _want_diarize(value: str) -> bool:
+    """フロントから来た話者分離フラグを解釈する。
+
+    キーが未設定なら、たとえONで来ても黙って通常経路へ落とす
+    （トグル自体を出していないので、ここへ来るのは想定外の呼び出しだけ）。
+    """
+    return config.GLADIA_ENABLED and str(value).strip().lower() in ("1", "true", "on", "yes")
+
+
 def _read_html(name: str) -> str:
     with open(os.path.join(STATIC_DIR, name), encoding="utf-8") as fh:
         return fh.read()
@@ -124,16 +133,24 @@ async def api_usage(request: Request) -> JSONResponse:
     """
     _require_auth(request)
     data = await meters.read()
+    gladia_used = data.get("gladia_seconds") or 0.0
+    limit = float(config.GLADIA_MONTHLY_LIMIT_SECONDS)
     return JSONResponse({
         "year_month": data.get("year_month"),
         "groq_seconds": data.get("groq_seconds") or 0.0,
         "backend": meters.backend(),
+        # 話者分離は上限つき（無料10時間/月）なので、こちらは残量まで返す
+        "gladia_enabled": config.GLADIA_ENABLED,
+        "gladia_seconds": gladia_used,
+        "gladia_limit_seconds": limit,
+        "gladia_remaining_seconds": max(0.0, limit - gladia_used),
     })
 
 
 @app.post("/api/transcribe")
 async def transcribe(
-    request: Request, file: UploadFile, language: str = Form(""), pack_id: str = Form("")
+    request: Request, file: UploadFile, language: str = Form(""), pack_id: str = Form(""),
+    diarize: str = Form(""),
 ) -> JSONResponse:
     _require_auth(request)
 
@@ -179,7 +196,10 @@ async def transcribe(
         shutil.rmtree(workdir, ignore_errors=True)
         raise HTTPException(status_code=400, detail="空のファイルです。")
 
-    job_id = jobs.create_job(filename, workdir, input_path, lang, pack_id=pack_id.strip() or None)
+    job_id = jobs.create_job(
+        filename, workdir, input_path, lang,
+        pack_id=pack_id.strip() or None, diarize=_want_diarize(diarize),
+    )
     jobs.start(job_id)
     return JSONResponse({"job_id": job_id})
 
@@ -250,6 +270,9 @@ async def app_config(request: Request) -> JSONResponse:
         "direct_max_mb": config.DIRECT_UPLOAD_MAX_MB,
         "storage_max_mb": config.STORAGE_MAX_UPLOAD_MB,
         "part_mb": config.UPLOAD_PART_MB,
+        # 話者分離はキーがある時だけ。false ならフロントはトグルを出さない
+        "diarize_enabled": config.GLADIA_ENABLED,
+        "diarize_max_minutes": int(config.GLADIA_MAX_JOB_SECONDS / 60),
     })
 
 
@@ -353,6 +376,7 @@ async def transcribe_key(
     filename: str = Form("audio"),
     language: str = Form(""),
     pack_id: str = Form(""),
+    diarize: str = Form(""),
 ) -> JSONResponse:
     """R2にアップ済みのオブジェクト(key)を文字起こしする。
 
@@ -377,7 +401,8 @@ async def transcribe_key(
     # チャンク用の作業ディレクトリだけ用意（入力本体はR2からストリーミングする）
     workdir = tempfile.mkdtemp(prefix="tx_")
     job_id = jobs.create_job(
-        filename, workdir, get_url, lang, key=key, pack_id=pack_id.strip() or None
+        filename, workdir, get_url, lang, key=key, pack_id=pack_id.strip() or None,
+        diarize=_want_diarize(diarize),
     )
     jobs.start(job_id)
     return JSONResponse({"job_id": job_id})

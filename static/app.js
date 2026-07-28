@@ -18,6 +18,7 @@ let currentGran = "sec10";   // 選択中の切り方（プルダウンと連動
 let selectedFile = null;     // 選択中のファイル（開始ボタンで送信）
 let selectedLang = "ja";     // 選択中の言語（ja=日本語 / en=英語 / auto=他言語）
 let selectedPack = "";       // 選択中の語彙パックID（""=選択しない）
+let useDiarize = false;      // 話者分離モード（Gladia経路）を使うか
 let APP_VOCAB = { ja: [], en: [] };   // /api/vocab で上書き（言語別の [{id,label}]）
 let flavorTimer = null;      // 待ち時間の「声かけ文言」ローテーション用タイマー
 
@@ -30,6 +31,25 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const res = await fetch("/api/config");
     if (res.ok) APP_CONFIG = Object.assign(APP_CONFIG, await res.json());
   } catch (_) { /* 取得できなければ従来動作のまま */ }
+  // 話者分離はキーが設定されている時だけ選択肢に出す（無ければ存在ごと見せない）
+  if (APP_CONFIG.diarize_enabled) {
+    $("diarizePick").classList.remove("hidden");
+    $("diarizeNote").textContent =
+      `ONにすると別のAI（Gladia）で処理します。無料枠が月10時間までなので、使うぶんだけ残りが減ります。`
+      + `1ファイル${APP_CONFIG.diarize_max_minutes}分まで。OFFなら今までどおりです。`;
+    // 「できません」の告知と脚注は、使えるようになった以上そのままにしない
+    const caution = $("diarizeCaution");
+    if (caution) {
+      caution.innerHTML =
+        '<span class="ttl">話し手の聞き分け（話者分離）が使えます</span>'
+        + '下の「話者分離」をONにすると、話者ごとに「話者1／話者2」を付けて書き起こします。'
+        + '無料枠は月10時間までで、残りは上に出ています。';
+    }
+    const foot = $("footEngine");
+    if (foot) {
+      foot.textContent = "Groq Whisper による自動文字起こし（話者分離をONにしたときは Gladia）。";
+    }
+  }
 })();
 
 (async function loadVocab() {
@@ -65,6 +85,16 @@ async function refreshUsage() {
     $("usageNote").textContent =
       u.backend === "local" ? "（この端末の記録。再起動で消えます）" : "";
     line.classList.remove("hidden");
+
+    // 話者分離は上限つき（無料10時間/月）なので、こちらは残量まで出す
+    const dLine = $("diarizeUsageLine");
+    if (dLine && u.gladia_enabled) {
+      $("diarizeUsageValue").textContent =
+        `${fmtHm(u.gladia_seconds || 0)} / ${fmtHm(u.gladia_limit_seconds || 0)}`;
+      $("diarizeUsageNote").textContent =
+        `（残り ${fmtHm(u.gladia_remaining_seconds || 0)}）`;
+      dLine.classList.remove("hidden");
+    }
   } catch (_) { /* 取得できなければ表示しないだけ */ }
 }
 refreshUsage();
@@ -153,6 +183,9 @@ function populateVocab(lang) {
   $("vocabPick").style.display = packs.length ? "" : "none";
 }
 $("vocabPack").addEventListener("change", () => { selectedPack = $("vocabPack").value; });
+$("diarizeToggle").addEventListener("change", () => {
+  useDiarize = $("diarizeToggle").checked;
+});
 
 $("startBtn").addEventListener("click", () => {
   if (!selectedFile) return;
@@ -197,6 +230,7 @@ async function uploadDirect(file) {
   body.append("file", file);
   body.append("language", selectedLang);
   body.append("pack_id", selectedPack);
+  body.append("diarize", useDiarize ? "1" : "");
   const res = await fetch("/api/transcribe", { method: "POST", body });
   if (res.status === 401) { location.href = "/"; return null; }
   if (!res.ok) {
@@ -317,6 +351,7 @@ async function runMultipart(file, info) {
   body.append("filename", file.name);
   body.append("language", selectedLang);
   body.append("pack_id", selectedPack);
+  body.append("diarize", useDiarize ? "1" : "");
   const txRes = await fetch("/api/transcribe-key", { method: "POST", body });
   if (txRes.status === 401) { const u = new Error("unauth"); u.unauth = true; throw u; }
   if (!txRes.ok) {

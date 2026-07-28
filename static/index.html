@@ -31,7 +31,7 @@
     <!-- アップロード -->
     <div class="panel" id="uploadPanel">
       <h2 class="head">ファイルを選ぶ</h2>
-      <div class="caution">
+      <div class="caution" id="diarizeCaution">
         <span class="ttl">！話し手の聞き分け（話者分離）はできません！</span>
         無料重視のためです。改善できそうなら<a href="https://github.com/watanabe-show/Maiei-Transcriber" target="_blank" rel="noopener">こちら（GitHub）</a>へ。
       </div>
@@ -43,6 +43,11 @@
         <span class="usage-label">今月の文字起こし</span>
         <span class="usage-value" id="usageValue">—</span>
         <span class="usage-note" id="usageNote"></span>
+      </div>
+      <div class="usage hidden" id="diarizeUsageLine">
+        <span class="usage-label">今月の話者分離</span>
+        <span class="usage-value" id="diarizeUsageValue">—</span>
+        <span class="usage-note" id="diarizeUsageNote"></span>
       </div>
       <!-- ① ファイルを選ぶ / 録音する -->
       <div id="pickSection">
@@ -88,6 +93,18 @@
             <option value="" selected>選択しない（語彙補正なし）</option>
           </select>
           <div class="lang-note">選んだ分野の固有名詞をWhisperに教え、人名・専門用語の表記精度を上げます。迷ったら「選択しない」のままでOK。</div>
+        </div>
+
+        <div class="lang-pick hidden" id="diarizePick">
+          <div class="lang-label">話し手の聞き分け（話者分離）</div>
+          <label class="switch">
+            <input type="checkbox" id="diarizeToggle" />
+            <span>話者ごとに「話者1／話者2」を付ける</span>
+          </label>
+          <div class="lang-note" id="diarizeNote">
+            ONにすると別のAI（Gladia）で処理します。無料枠が月10時間までなので、
+            使うぶんだけ残りが減ります。OFFなら今までどおりです。
+          </div>
         </div>
 
         <div class="row" style="margin-top:18px">
@@ -148,7 +165,7 @@
 
     <div class="foot">
       <hr class="rule" />
-      Groq Whisper による自動文字起こし（話者分離なし）。文章の「切り方」は一文ごと〜段落ごとから選べます。<br />
+      <span id="footEngine">Groq Whisper による自動文字起こし（話者分離なし）。</span>文章の「切り方」は一文ごと〜段落ごとから選べます。<br />
       アップロードしたファイルは処理後にサーバーから自動削除されます。
     </div>
   </div>

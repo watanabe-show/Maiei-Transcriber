@@ -21,6 +21,9 @@ services:
         value: ja
       - key: GROQ_MODEL
         value: whisper-large-v3
+      # ----- 話者分離（任意）。未設定ならトグルが出ず従来どおり -----
+      - key: GLADIA_API_KEY
+        sync: false        # ダッシュボードで入力（コミットしない）
       # ----- 大容量動画むけ：R2(S3互換)直アップロード（任意。未設定なら従来動作）-----
       # 4つ全て設定したときだけ有効になる。ダッシュボードで入力（コミットしない）。
       - key: S3_ENDPOINT

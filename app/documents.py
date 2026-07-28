@@ -43,7 +43,7 @@ def build_docx(
         sp_run.font.color.rgb = RGBColor(0x80, 0x80, 0x80)
 
     for para in paragraphs:
-        text = (para.get("text") or "").strip()
+        text = formats.body_text(para)   # 話者分離つきなら「話者1：」が頭に付く
         if not text:
             continue
         if show_tc:
@@ -81,7 +81,10 @@ def _fill_sheet(ws, rows: list[dict]) -> None:
 
     n = 0
     for r in rows:
-        text = (r.get("text") or "").strip()
+        # 話者分離つきなら本文の頭に「話者1：」を付ける。列は増やさない
+        # （この関数は本文シートと詳細シートで共用しており、列幅も手で調整してあるため。
+        #   先頭に付けることで _safe_cell の数式インジェクション対策もそのまま効く）
+        text = formats.body_text(r)
         if not text:
             continue
         n += 1

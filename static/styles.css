@@ -348,6 +348,13 @@ select:focus, input:focus { border-color: var(--vermilion); background: var(--fi
 .usage-value { color: var(--ink); font-weight: 800; font-size: 13.5px; }
 .usage-note { font-size: 11.5px; opacity: .75; }
 
+/* ---- 話者分離のON/OFF ---- */
+.switch {
+  display: inline-flex; align-items: center; gap: 9px; cursor: pointer;
+  font-size: 13px; color: var(--ink); line-height: 1.6;
+}
+.switch input { width: 17px; height: 17px; accent-color: var(--vermilion-d); cursor: pointer; }
+
 /* ---- 重要な注意書き（朱印・告知札風）---- */
 .caution {
   position: relative;

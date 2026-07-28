@@ -19,6 +19,9 @@ os.environ.setdefault("DEFAULT_LANGUAGE", "ja")
 for _k in ("S3_ENDPOINT", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"):
     os.environ[_k] = ""
 
+# Gladiaのキーも必ず空にする（実際のAPIを叩かない／トグル非表示の確認もするため）
+os.environ["GLADIA_API_KEY"] = ""
+
 # プロジェクトルートを import パスに追加
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -183,8 +186,8 @@ check("月キーが YYYY-MM 形式", bool(re.fullmatch(r"\d{4}-\d{2}", meters.mo
 
 # 台帳の実体はテスト用の一時ディレクトリへ逃がす（プロジェクトを汚さない）
 meters.LOCAL_DIR = os.path.join(work, "meters")
-asyncio.run(meters.add_groq_seconds(90))
-asyncio.run(meters.add_groq_seconds(30))
+asyncio.run(meters.add_seconds("groq", 90))
+asyncio.run(meters.add_seconds("groq", 30))
 led = asyncio.run(meters.read())
 check("加算が積み上がる(上書きでなく差分加算)", abs(led["groq_seconds"] - 120.0) < 0.01,
       f"{led['groq_seconds']}秒")
@@ -193,6 +196,71 @@ r = client.get("/api/usage")
 check("/api/usage が今月の秒数を返す",
       r.status_code == 200 and r.json().get("groq_seconds") == 120.0,
       f"status={r.status_code} body={r.text[:80]}")
+
+print("=== 8. 話者分離（Gladia経路の整形・遮断ロジック）===")
+from app import gladia_client  # noqa: E402
+
+# --- 応答の整形 ---
+fake_result = {
+    "transcription": {"utterances": [
+        {"speaker": 0, "start": 0.0, "end": 3.0, "text": "こんばんは。"},
+        {"speaker": 1, "start": 3.2, "end": 6.0, "text": "よろしくお願いします。"},
+        {"speaker": 0, "start": 6.2, "end": 9.0, "text": "本日のテーマです。"},
+        {"speaker": 4, "start": 9.1, "end": 9.4, "text": "ええ"},          # 過検出の断片
+    ]},
+    "metadata": {"billing_time": 840.0},
+}
+gsegs = gladia_client.to_segments(fake_result)
+check("utterancesをsegments形に直せる", len(gsegs) == 4 and gsegs[0]["speaker"] == 0,
+      f"{len(gsegs)}件")
+check("billing_timeを実績として取れる", gladia_client.billing_seconds(fake_result) == 840.0)
+
+merged = gladia_client.merge_minor_speakers(gsegs, keep=2)
+check("過検出の少数話者が上位2人へ統合される",
+      len({s["speaker"] for s in merged}) == 2, f"{sorted({s['speaker'] for s in merged})}")
+
+# --- 話者が変わったら必ずブロックが切れる ---
+blocks = formats.build_blocks(merged, "para_meaning")
+check("話者が変わるとブロックが分かれる", len(blocks) >= 3, f"{len(blocks)}ブロック")
+check("各ブロックに話者が付く", all(b.get("speaker") is not None for b in blocks))
+
+# --- 出力に話者ラベルが載る ---
+d_txt, _, _ = formats.render_text(merged, "txt", "plain")
+check("テキストに「話者1：」が付く", "話者1：" in d_txt, d_txt[:40].replace("\n", " "))
+d_srt, _, _ = formats.render_text(merged, "srt")
+check("字幕(srt)にも話者が付く", "話者" in d_srt)
+d_docx = documents.build_docx(formats.build_blocks(merged, "plain"), title="話者テスト", show_tc=False)
+check("Word(話者つき)が生成される", d_docx[:2] == b"PK" and len(d_docx) > 2000)
+d_xlsx = documents.build_xlsx(blocks, merged, body_label="本文")
+check("Excel(話者つき)が生成される", d_xlsx[:2] == b"PK" and len(d_xlsx) > 2000)
+
+# --- 話者なしの結果は従来と1文字も変わらない（退行防止）---
+check("話者なしの出力は従来どおり",
+      formats.render_text(segs, "txt", "plain")[0] == formats.to_readable_text(
+          formats.group_paragraphs(segs)))
+
+# --- 無料枠のハード遮断 ---
+LIMIT = 3600.0   # テスト用に1時間
+ok1, _ = asyncio.run(meters.try_reserve("gladia", 3000, LIMIT))
+ok2, used2 = asyncio.run(meters.try_reserve("gladia", 3000, LIMIT))
+check("上限内なら確保できる", ok1 is True)
+check("上限を超える確保は拒否される", ok2 is False and used2 == 3000.0, f"used={used2}")
+
+asyncio.run(meters.adjust("gladia", -200.0))   # 実績が予約より短かった場合の補正
+led2 = asyncio.run(meters.read())
+check("実績への補正が効く", abs(led2["gladia_seconds"] - 2800.0) < 0.01,
+      f"{led2['gladia_seconds']}秒")
+
+r = client.get("/api/usage")
+check("/api/usage が話者分離の残量を返す",
+      r.status_code == 200 and abs(r.json().get("gladia_remaining_seconds", -1)
+                                   - (36000.0 - 2800.0)) < 0.01,
+      r.text[:110])
+
+# --- キー未設定ならトグルを出さない ---
+r = client.get("/api/config")
+check("キー未設定なら話者分離を出さない",
+      r.json().get("diarize_enabled") is False, r.text[:90])
 
 print("\n=== 結果 ===")
 print(f"  成功 {sum(results)} / {len(results)}")
