@@ -32,23 +32,25 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const res = await fetch("/api/config");
     if (res.ok) APP_CONFIG = Object.assign(APP_CONFIG, await res.json());
   } catch (_) { /* 取得できなければ従来動作のまま */ }
-  // 話者分離はキーが設定されている時だけ選択肢に出す（無ければ存在ごと見せない）
+  // 話者分離はキーが設定されている時だけ出す（無ければボタンごと見せない）
   if (APP_CONFIG.diarize_enabled) {
-    $("diarizePick").classList.remove("hidden");
+    $("startDiarizeBtn").classList.remove("hidden");
+    $("diarizeBox").classList.remove("hidden");
     $("diarizeNote").textContent =
-      `ONにすると別のAI（Gladia）で処理します。無料枠が月10時間までなので、使うぶんだけ残りが減ります。`
-      + `1ファイル${APP_CONFIG.diarize_max_minutes}分まで。OFFなら今までどおりです。`;
-    // 「できません」の告知と脚注は、使えるようになった以上そのままにしない
+      `こちらは別のAI（Gladia）で処理します。1ファイル${APP_CONFIG.diarize_max_minutes}分まで。`
+      + `左の「文字起こし開始」なら今までどおり（話者分離なし）です。`;
+    updateSpeakerNote();
+    // 「できません」の告知は、使えるようになった以上そのままにしない
     const caution = $("diarizeCaution");
     if (caution) {
       caution.innerHTML =
         '<span class="ttl">🎉話し手の聞き分け（話者分離）が使えます🎉</span>'
-        + `ONにすると「話者1〜${APP_CONFIG.diarize_max_speakers}」で書き起こし。`
+        + `［話者分離して文字起こし］で「話者1〜${APP_CONFIG.diarize_max_speakers}」に分けて書き起こし。`
         + '無料枠は月10時間…なので早い者勝ちです。';
     }
     const foot = $("footEngine");
     if (foot) {
-      foot.textContent = "Groq Whisper による自動文字起こし（話者分離をONにしたときは Gladia）。";
+      foot.textContent = "Groq Whisper による自動文字起こし（［話者分離して文字起こし］のときは Gladia）。";
     }
   }
 })();
@@ -88,14 +90,12 @@ async function refreshUsage() {
       + (u.backend === "local" ? "　※この端末の記録。再起動で消えます" : "");
     line.classList.remove("hidden");
 
-    // 話者分離は上限つき（無料10時間/月）なので、こちらは残量まで出す
-    const dLine = $("diarizeUsageLine");
-    if (dLine && u.gladia_enabled) {
-      $("diarizeUsageValue").textContent =
-        `${fmtHm(u.gladia_seconds || 0)} / ${fmtHm(u.gladia_limit_seconds || 0)}`;
-      $("diarizeUsageNote").textContent =
-        `（残り ${fmtHm(u.gladia_remaining_seconds || 0)}）`;
-      dLine.classList.remove("hidden");
+    // 話者分離は上限つき（無料10時間/月）。残量はボタンの直下に出す
+    const remain = $("diarizeRemain");
+    if (remain && u.gladia_enabled) {
+      remain.textContent =
+        `今月 ${fmtHm(u.gladia_seconds || 0)} 使用 ／ 残り ${fmtHm(u.gladia_remaining_seconds || 0)}`
+        + `（無料枠 ${fmtHm(u.gladia_limit_seconds || 0)}）`;
     }
   } catch (_) { /* 取得できなければ表示しないだけ */ }
 }
@@ -195,12 +195,6 @@ const SPEAKER_NOTE = {
 function updateSpeakerNote() {
   $("speakerNote").textContent = SPEAKER_NOTE[$("speakerCount").value] || "";
 }
-$("diarizeToggle").addEventListener("change", () => {
-  useDiarize = $("diarizeToggle").checked;
-  // 人数はONのときだけ意味を持つので、それに合わせて出し入れする
-  $("speakerPick").classList.toggle("hidden", !useDiarize);
-  updateSpeakerNote();
-});
 $("speakerCount").addEventListener("change", () => {
   selectedSpeakers = $("speakerCount").value;
   updateSpeakerNote();
@@ -208,6 +202,13 @@ $("speakerCount").addEventListener("change", () => {
 
 $("startBtn").addEventListener("click", () => {
   if (!selectedFile) return;
+  useDiarize = false;                 // 通常（Groq）経路
+  startTranscription(selectedFile);
+});
+
+$("startDiarizeBtn").addEventListener("click", () => {
+  if (!selectedFile) return;
+  useDiarize = true;                  // 話者分離（Gladia）経路
   startTranscription(selectedFile);
 });
 

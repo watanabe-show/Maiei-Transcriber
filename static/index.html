@@ -31,7 +31,7 @@
     <!-- アップロード -->
     <div class="panel" id="uploadPanel">
       <h2 class="head">ファイルを選ぶ</h2>
-      <div class="caution" id="diarizeCaution">
+      <div class="note note-topic" id="diarizeCaution">
         <span class="ttl">！話し手の聞き分け（話者分離）はできません！</span>
         無料重視のためです。改善できそうなら<a href="https://github.com/watanabe-show/Maiei-Transcriber" target="_blank" rel="noopener">こちら（GitHub）</a>へ。
       </div>
@@ -43,11 +43,6 @@
         <span class="usage-label">今月このアプリで文字起こしした音声</span>
         <span class="usage-value" id="usageValue">—</span>
         <span class="usage-note" id="usageNote"></span>
-      </div>
-      <div class="usage hidden" id="diarizeUsageLine">
-        <span class="usage-label">今月の話者分離</span>
-        <span class="usage-value" id="diarizeUsageValue">—</span>
-        <span class="usage-note" id="diarizeUsageNote"></span>
       </div>
       <!-- ① ファイルを選ぶ / 録音する -->
       <div id="pickSection">
@@ -95,34 +90,30 @@
           <div class="lang-note">選んだ分野の固有名詞をWhisperに教え、人名・専門用語の表記精度を上げます。迷ったら「選択しない」のままでOK。</div>
         </div>
 
-        <div class="lang-pick hidden" id="diarizePick">
-          <div class="lang-label">話し手の聞き分け（話者分離）</div>
-          <label class="switch">
-            <input type="checkbox" id="diarizeToggle" />
-            <span>話者ごとにラベルを付ける</span>
-          </label>
-          <div class="speaker-pick hidden" id="speakerPick">
-            <label class="field field-row">話し手の人数
-              <select id="speakerCount">
-                <option value="0" selected>おまかせ</option>
-                <option value="2">2人</option>
-                <option value="3">3人</option>
-                <option value="4">4人</option>
-                <option value="5">5人</option>
-              </select>
-            </label>
-            <span class="usage-note" id="speakerNote"></span>
-          </div>
-          <div class="lang-note" id="diarizeNote">
-            ONにすると別のAI（Gladia）で処理します。無料枠が月10時間までなので、
-            使うぶんだけ残りが減ります。OFFなら今までどおりです。
-          </div>
-        </div>
-
         <div class="row" style="margin-top:18px">
           <button class="btn btn-stamp" id="startBtn">▶ 文字起こし開始</button>
+          <button class="btn hidden" id="startDiarizeBtn">👥 話者分離して文字起こし</button>
           <div class="spacer"></div>
           <button class="btn btn-ghost" id="repickBtn">別のファイルを選ぶ</button>
+        </div>
+
+        <!-- 話者分離まわりの説明・設定はボタンの直下に集約する（任意の機能だと分かるように） -->
+        <div class="diarize-box hidden" id="diarizeBox">
+          <div class="diarize-head">
+            <span class="diarize-tag">話者分離について</span>
+            <span class="diarize-remain" id="diarizeRemain"></span>
+          </div>
+          <label class="field field-row">話し手の人数
+            <select id="speakerCount">
+              <option value="0" selected>おまかせ</option>
+              <option value="2">2人</option>
+              <option value="3">3人</option>
+              <option value="4">4人</option>
+              <option value="5">5人</option>
+            </select>
+          </label>
+          <div class="lang-note" id="speakerNote"></div>
+          <div class="lang-note" id="diarizeNote"></div>
         </div>
       </div>
     </div>
