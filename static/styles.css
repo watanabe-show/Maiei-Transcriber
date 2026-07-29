@@ -365,10 +365,6 @@ select:focus, input:focus { border-color: var(--vermilion); background: var(--fi
   display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
   margin-bottom: 8px;
 }
-.diarize-tag {
-  font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
-  font-size: 12.5px; letter-spacing: .08em; color: var(--ink);
-}
 .diarize-remain { font-size: 12px; color: var(--ink-soft); }
 .diarize-box .lang-note { margin-top: 6px; text-align: left; }
 /* 人数の選択は左寄せに（.field は既定で中央寄せのため） */

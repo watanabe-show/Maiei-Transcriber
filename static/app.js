@@ -36,9 +36,6 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   if (APP_CONFIG.diarize_enabled) {
     $("startDiarizeBtn").classList.remove("hidden");
     $("diarizeBox").classList.remove("hidden");
-    $("diarizeNote").textContent =
-      `こちらは別のAI（Gladia）で処理します。1ファイル${APP_CONFIG.diarize_max_minutes}分まで。`
-      + `左の「文字起こし開始」なら今までどおり（話者分離なし）です。`;
     updateSpeakerNote();
     // 「できません」の告知は、使えるようになった以上そのままにしない
     const caution = $("diarizeCaution");
@@ -93,9 +90,7 @@ async function refreshUsage() {
     // 話者分離は上限つき（無料10時間/月）。残量はボタンの直下に出す
     const remain = $("diarizeRemain");
     if (remain && u.gladia_enabled) {
-      remain.textContent =
-        `今月 ${fmtHm(u.gladia_seconds || 0)} 使用 ／ 残り ${fmtHm(u.gladia_remaining_seconds || 0)}`
-        + `（無料枠 ${fmtHm(u.gladia_limit_seconds || 0)}）`;
+      remain.textContent = `今月の残り ${fmtHm(u.gladia_remaining_seconds || 0)}`;
     }
   } catch (_) { /* 取得できなければ表示しないだけ */ }
 }
@@ -193,7 +188,9 @@ const SPEAKER_NOTE = {
   "5": "大人数の会議など。",
 };
 function updateSpeakerNote() {
-  $("speakerNote").textContent = SPEAKER_NOTE[$("speakerCount").value] || "";
+  const max = APP_CONFIG.diarize_max_minutes;
+  $("speakerNote").textContent =
+    (SPEAKER_NOTE[$("speakerCount").value] || "") + (max ? `1ファイル${max}分まで。` : "");
 }
 $("speakerCount").addEventListener("change", () => {
   selectedSpeakers = $("speakerCount").value;
